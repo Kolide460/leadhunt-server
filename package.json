@@ -1,0 +1,14 @@
+{
+  "name": "leadhunt-proxy",
+  "version": "1.0.0",
+  "description": "CORS proxy for Google Places API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "node-fetch": "^3.3.2"
+  }
+}
