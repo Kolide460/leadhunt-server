@@ -5,6 +5,7 @@ const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args
 const app = express();
 const PORT = process.env.PORT || 3000;
 const PLACES_KEY = process.env.PLACES_KEY;
+const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
 
 app.use(cors());
 app.use(express.json());
@@ -29,6 +30,30 @@ app.get('/details', async (req, res) => {
     const fields = 'name,formatted_address,website,rating,user_ratings_total,formatted_phone_number';
     const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place_id}&fields=${fields}&key=${PLACES_KEY}`;
     const response = await fetch(url);
+    const data = await response.json();
+    res.json(data);
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Generate website via Anthropic
+app.post('/generate', async (req, res) => {
+  try {
+    const { prompt } = req.body;
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 4000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
     const data = await response.json();
     res.json(data);
   } catch(e) {
