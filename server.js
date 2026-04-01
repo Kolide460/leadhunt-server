@@ -37,10 +37,22 @@ app.get('/details', async (req, res) => {
   }
 });
 
+// Debug endpoint - check if API key is loaded
+app.get('/debug', (req, res) => {
+  res.json({
+    has_anthropic_key: !!ANTHROPIC_KEY,
+    key_preview: ANTHROPIC_KEY ? ANTHROPIC_KEY.substring(0, 10) + '...' : 'NOT SET',
+    has_places_key: !!PLACES_KEY
+  });
+});
+
 // Generate website via Anthropic
 app.post('/generate', async (req, res) => {
   try {
     const { prompt } = req.body;
+    if (!ANTHROPIC_KEY) {
+      return res.status(500).json({ error: 'ANTHROPIC_KEY environment variable not set on server' });
+    }
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
