@@ -663,10 +663,6 @@ REQUIREMENTS:
   }
 }
 
-function pollinationsUrl(prompt, w, h, seed) {
-  // Note: NO &enhance or extra params — keep URL clean
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&model=flux&seed=${seed}`;
-}
 
 async function generateBranding(biz, biztype) {
   currentBiz = biz;
@@ -698,29 +694,16 @@ async function generateBranding(biz, biztype) {
     'BRAND_IMG_BIZCARD':  { prompt: `premium luxury background texture for ${biztype} business card, dark rich tones, subtle pattern, no text`, w: 400, h: 240 },
   };
 
-  // Fetch all images in parallel through the backend (returns base64 data URIs)
+  // Build Pollinations URLs directly in the browser — Pollinations blocks server-side
+  // requests from Render's IP range (502) but serves browser img tags fine.
   const tokens = Object.keys(imgDefs);
-  let done = 0;
   const imgMap = {};
-
-  await Promise.all(tokens.map(async token => {
+  for (const token of tokens) {
     const { prompt: p, w, h } = imgDefs[token];
-    try {
-      const r = await fetch(`${API_BASE}/generate-image?prompt=${encodeURIComponent(p)}&w=${w}&h=${h}&seed=${seed}`);
-      const j = await r.json();
-      // Use embedded base64 if proxy succeeded, otherwise fall back to direct Pollinations URL
-      imgMap[token] = j.dataUri || j.url || null;
-      if (j.error) console.warn(`Image proxy failed for ${token} (using direct URL):`, j.error);
-    } catch(e) {
-      // If backend is totally unreachable, build the Pollinations URL client-side as last resort
-      console.warn(`Image fetch failed for ${token}:`, e.message);
-      imgMap[token] = `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=${w}&height=${h}&nologo=true&model=flux&seed=${seed}`;
-    }
-    done++;
-    setStatus(`Generating AI images... ${done}/${tokens.length}`, `${token.replace('BRAND_IMG_', '')} done`);
-  }));
+    imgMap[token] = `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=${w}&height=${h}&nologo=true&model=flux&seed=${seed}`;
+  }
 
-  setStatus('Building branding kit...', 'Images ready — assembling with Claude');
+  setStatus('Building branding kit...', 'Assembling with Claude — images will load in the background');
 
   // Prompt uses only safe token names — no URLs, no & characters
   const prompt = `You are a senior brand designer. Build a complete single-file HTML branding kit. Use the placeholder tokens EXACTLY as written — they will be replaced with real AI images after generation.
