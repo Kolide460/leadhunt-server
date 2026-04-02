@@ -678,39 +678,73 @@ async function generateBranding(biz, biztype) {
       </div>`;
   }
 
-  setStatus('Generating brand images with Claude AI...', 'Designing logo, backgrounds, and social media assets');
+  setStatus('Generating images with DALL-E 3...', 'AI is creating your logo and brand imagery — takes 30–60 seconds');
 
-  // Generate all 7 SVG images via Claude in one API call
+  // Each token maps to a DALL-E prompt and size
+  const imgDefs = [
+    {
+      token: 'BRAND_IMG_LOGO',
+      size: '1024x1024',
+      prompt: `Professional minimalist logo mark for "${biz.name}", a ${biztype} business. Clean iconic symbol, no text, no letters, no words. White background. Bold single icon that represents ${biztype}. Flat design, vector style, strong brand identity. Suitable for use as a business logo icon.`
+    },
+    {
+      token: 'BRAND_IMG_LOGODARK',
+      size: '1024x1024',
+      prompt: `Professional minimalist logo mark for "${biz.name}", a ${biztype} business. Clean iconic symbol, no text, no letters. Dark navy or black background. White or light-coloured icon. Same concept as a light version but inverted. Bold, modern brand mark.`
+    },
+    {
+      token: 'BRAND_IMG_BANNER',
+      size: '1792x1024',
+      prompt: `Wide cinematic marketing banner background for a ${biztype} business called "${biz.name}" in Cornwall, UK. Professional atmospheric photography style. Moody, dramatic lighting. No text, no people, no logos. Dark vignette edges perfect for overlaying text. High-end brand feel.`
+    },
+    {
+      token: 'BRAND_IMG_IGPOST',
+      size: '1024x1024',
+      prompt: `Square Instagram post background for a ${biztype} business called "${biz.name}". Beautiful atmospheric lifestyle photography. Warm tones, professional quality. No text, no people. Suitable for overlaying business name and contact details.`
+    },
+    {
+      token: 'BRAND_IMG_IGSTORY',
+      size: '1024x1792',
+      prompt: `Vertical Instagram story background for a ${biztype} business called "${biz.name}". Dramatic portrait-format atmospheric photography. Rich colours, cinematic quality. No text, no people. Dark edges suitable for overlaying text at top and bottom.`
+    },
+    {
+      token: 'BRAND_IMG_POSTER',
+      size: '1024x1792',
+      prompt: `Vertical promotional poster background for a ${biztype} business called "${biz.name}" in Cornwall, UK. Bold dramatic photography, rich saturated colours. No text, no people. High impact, suitable for overlaying business information.`
+    },
+    {
+      token: 'BRAND_IMG_BIZCARD',
+      size: '1792x1024',
+      prompt: `Premium horizontal business card background texture for a ${biztype} business. Subtle luxury abstract pattern or texture. Dark rich tones. No text, no logos. Elegant and professional, suitable for printing.`
+    },
+  ];
+
   const imgMap = {};
-  try {
-    const imgRes = await fetch(`${API_BASE}/generate-branding-images`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: biz.name, biztype })
-    });
-    const svgs = await imgRes.json();
-    if (svgs.error) throw new Error(svgs.error);
+  let done = 0;
 
-    // Convert each SVG string to a data URI for safe embedding
-    const keyToToken = {
-      logoMark:  'BRAND_IMG_LOGO',
-      logoDark:  'BRAND_IMG_LOGODARK',
-      banner:    'BRAND_IMG_BANNER',
-      igPost:    'BRAND_IMG_IGPOST',
-      igStory:   'BRAND_IMG_IGSTORY',
-      poster:    'BRAND_IMG_POSTER',
-      bizCard:   'BRAND_IMG_BIZCARD',
-    };
-    for (const [key, token] of Object.entries(keyToToken)) {
-      if (svgs[key]) {
-        imgMap[token] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgs[key]);
-      }
+  await Promise.all(imgDefs.map(async ({ token, size, prompt: imgPrompt }) => {
+    try {
+      const r = await fetch(`${API_BASE}/generate-image`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: imgPrompt, size })
+      });
+      const j = await r.json();
+      if (j.error) throw new Error(j.error);
+      imgMap[token] = j.dataUri;
+    } catch(e) {
+      console.warn(`Image failed for ${token}:`, e.message);
     }
-  } catch(e) {
-    console.warn('Branding image generation failed:', e.message);
-  }
+    done++;
+    setStatus(`Generating images with DALL-E 3... ${done}/${imgDefs.length}`, `${token.replace('BRAND_IMG_','')} done`);
+  }));
 
-  setStatus('Building branding kit...', 'Images ready — assembling full brand guide');
+  const ready = Object.keys(imgMap).length;
+  if (ready === 0) {
+    document.getElementById('modalBody').innerHTML = `<div style="padding:32px"><div class="error-box"><strong>Image generation failed</strong><br><br>Check that OPENAI_KEY is set in your Render environment variables.</div></div>`;
+    return;
+  }
+  setStatus('Building branding kit...', `${ready}/${imgDefs.length} images ready — assembling with Claude`);
 
   // Prompt uses only safe token names — no URLs, no & characters
   const prompt = `You are a senior brand designer. Build a complete single-file HTML branding kit. Use the placeholder tokens EXACTLY as written — they will be replaced with real AI images after generation.
