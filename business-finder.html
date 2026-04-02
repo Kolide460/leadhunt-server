@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>LeadGen Pro — Business Website Finder</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0A0A0F;
+  --surface:#12121A;
+  --surface2:#1A1A26;
+  --border:#2A2A3A;
+  --accent:#00E5A0;
+  --accent2:#7C3AED;
+  --text:#F0F0F8;
+  --muted:#6B6B80;
+  --warning:#F59E0B;
+  --danger:#EF4444;
+}
+html{scroll-behavior:smooth;}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+
+/* HEADER */
+header{
+  padding:20px 32px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);
+  background:rgba(10,10,15,0.95);
+  position:sticky;top:0;z-index:50;
+  backdrop-filter:blur(8px);
+}
+.logo{font-family:'Syne',sans-serif;font-size:20px;font-weight:800;letter-spacing:-0.02em;}
+.logo span{color:var(--accent);}
+.logo small{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);display:block;font-weight:300;letter-spacing:0.1em;margin-top:1px;}
+.header-tag{font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.2);padding:4px 12px;border-radius:20px;}
+
+/* MAIN LAYOUT */
+main{display:grid;grid-template-columns:360px 1fr;min-height:calc(100vh - 65px);}
+
+/* SIDEBAR */
+.sidebar{
+  border-right:1px solid var(--border);
+  padding:28px 24px;
+  display:flex;flex-direction:column;gap:20px;
+  background:var(--surface);
+}
+.sidebar-title{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;margin-bottom:4px;}
+label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px;}
+input,select{
+  width:100%;background:var(--surface2);border:1px solid var(--border);
+  border-radius:6px;padding:11px 14px;
+  font-family:'DM Sans',sans-serif;font-size:14px;color:var(--text);
+  outline:none;transition:border-color 0.2s;
+}
+input:focus,select:focus{border-color:var(--accent);}
+input::placeholder{color:var(--muted);}
+select option{background:var(--surface2);}
+.field{display:flex;flex-direction:column;}
+
+.search-btn{
+  background:var(--accent);color:#000;border:none;
+  padding:13px 20px;border-radius:6px;
+  font-family:'Syne',sans-serif;font-size:14px;font-weight:700;
+  cursor:pointer;letter-spacing:0.02em;
+  transition:opacity 0.2s,transform 0.15s;
+  width:100%;
+}
+.search-btn:hover{opacity:0.88;transform:translateY(-1px);}
+.search-btn:disabled{opacity:0.4;cursor:not-allowed;transform:none;}
+
+.divider{border:none;border-top:1px solid var(--border);}
+
+.stat-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.stat-box{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px 14px;}
+.stat-box .n{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--accent);}
+.stat-box .l{font-size:11px;color:var(--muted);margin-top:2px;letter-spacing:0.04em;}
+
+.info-box{background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.25);border-radius:6px;padding:14px;font-size:13px;color:rgba(200,180,255,0.8);line-height:1.6;}
+.info-box strong{color:#C4B5FD;display:block;margin-bottom:4px;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;}
+
+/* CONTENT AREA */
+.content{display:flex;flex-direction:column;}
+
+/* EMPTY STATE */
+.empty-state{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;padding:60px 40px;text-align:center;
+}
+.empty-icon{font-size:48px;opacity:0.3;}
+.empty-state h3{font-family:'Syne',sans-serif;font-size:20px;font-weight:700;color:var(--muted);}
+.empty-state p{font-size:14px;color:var(--muted);max-width:320px;line-height:1.6;}
+
+/* LOADING */
+.loading{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;}
+.spinner{width:36px;height:36px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.loading p{font-size:14px;color:var(--muted);font-family:'DM Mono',monospace;}
+
+/* RESULTS */
+.results-header{
+  padding:20px 28px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--surface);
+}
+.results-header h2{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;}
+.results-header span{font-size:13px;color:var(--muted);}
+.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;letter-spacing:0.05em;}
+.badge-green{background:rgba(0,229,160,0.1);color:var(--accent);border:1px solid rgba(0,229,160,0.2);}
+.badge-yellow{background:rgba(245,158,11,0.1);color:var(--warning);border:1px solid rgba(245,158,11,0.2);}
+.badge-red{background:rgba(239,68,68,0.1);color:var(--danger);border:1px solid rgba(239,68,68,0.2);}
+
+.results-list{display:flex;flex-direction:column;overflow-y:auto;}
+.biz-card{
+  padding:20px 28px;border-bottom:1px solid var(--border);
+  display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;
+  transition:background 0.15s;cursor:pointer;
+}
+.biz-card:hover{background:var(--surface);}
+.biz-name{font-family:'Syne',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px;}
+.biz-meta{font-size:13px;color:var(--muted);margin-bottom:8px;line-height:1.5;}
+.biz-tags{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.biz-actions{display:flex;flex-direction:column;gap:8px;align-items:flex-end;}
+.gen-btn{
+  background:var(--accent);color:#000;border:none;
+  padding:8px 16px;border-radius:5px;
+  font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
+  cursor:pointer;white-space:nowrap;transition:opacity 0.2s;
+}
+.gen-btn:hover{opacity:0.85;}
+.gen-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.brand-btn{
+  background:var(--accent2);color:#fff;border:none;
+  padding:8px 16px;border-radius:5px;
+  font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
+  cursor:pointer;white-space:nowrap;transition:opacity 0.2s;
+}
+.brand-btn:hover{opacity:0.85;}
+.brand-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.rating{font-size:12px;color:var(--muted);}
+.no-website-flag{color:var(--accent);font-size:11px;font-family:'DM Mono',monospace;}
+
+/* MODAL */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,0.85);
+  display:flex;align-items:center;justify-content:center;
+  z-index:100;padding:20px;
+  backdrop-filter:blur(4px);
+}
+.modal{
+  background:var(--surface);border:1px solid var(--border);border-radius:10px;
+  width:100%;max-width:900px;max-height:90vh;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.modal-header{
+  padding:20px 24px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+}
+.modal-header h3{font-family:'Syne',sans-serif;font-size:17px;font-weight:700;}
+.modal-close{background:none;border:1px solid var(--border);color:var(--muted);width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:16px;transition:color 0.2s;}
+.modal-close:hover{color:var(--text);}
+.modal-body{flex:1;overflow-y:auto;padding:24px;}
+.modal-loading{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:60px;text-align:center;}
+.modal-loading p{font-size:14px;color:var(--muted);font-family:'DM Mono',monospace;}
+.modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:12px;justify-content:flex-end;}
+
+.website-preview{background:var(--bg);border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.preview-bar{background:var(--surface2);padding:10px 14px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--border);}
+.preview-dots{display:flex;gap:5px;}
+.preview-dots span{width:10px;height:10px;border-radius:50%;}
+.d1{background:#FF5F57;} .d2{background:#FEBC2E;} .d3{background:#28C840;}
+.preview-url{flex:1;background:var(--border);border-radius:4px;padding:4px 12px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);text-align:center;}
+iframe{width:100%;height:480px;border:none;background:#fff;}
+
+.copy-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 20px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:13px;cursor:pointer;transition:border-color 0.2s;}
+.copy-btn:hover{border-color:var(--accent);}
+.dl-btn{background:var(--accent);color:#000;border:none;padding:10px 20px;border-radius:6px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;transition:opacity 0.2s;}
+.dl-btn:hover{opacity:0.85;}
+
+.error-box{background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:6px;padding:16px;font-size:14px;color:#FCA5A5;line-height:1.6;}
+
+/* EDITOR OVERLAY */
+#editorOverlay{
+  position:fixed;inset:0;background:var(--bg);z-index:200;
+  display:none;flex-direction:column;
+}
+#editorHeader{
+  padding:12px 20px;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;gap:12px;flex-shrink:0;
+}
+#editorTitle{font-family:'Syne',sans-serif;font-size:14px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.editor-header-actions{display:flex;gap:8px;flex-shrink:0;}
+.editor-header-actions button{
+  background:var(--surface2);border:1px solid var(--border);color:var(--text);
+  padding:7px 14px;border-radius:5px;font-family:'DM Sans',sans-serif;font-size:12px;
+  cursor:pointer;transition:border-color 0.2s,background 0.2s;white-space:nowrap;
+}
+.editor-header-actions button:hover{border-color:var(--accent);color:var(--accent);}
+.editor-header-actions .save-btn{background:var(--accent);color:#000;border-color:var(--accent);font-family:'Syne',sans-serif;font-weight:700;}
+.editor-header-actions .save-btn:hover{opacity:0.85;color:#000;}
+#editorMain{display:grid;grid-template-columns:1fr 1fr;flex:1;overflow:hidden;}
+#editorPane{display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden;}
+#editorPaneHeader{
+  padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);
+  font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.08em;
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+}
+#editorPane .CodeMirror{flex:1;height:100%;font-family:'DM Mono',monospace;font-size:13px;line-height:1.6;}
+#editorPane .CodeMirror-scroll{height:100%;}
+#previewPane{display:flex;flex-direction:column;overflow:hidden;background:#f5f5f5;}
+#previewPaneHeader{
+  padding:8px 16px;background:var(--surface2);border-bottom:1px solid var(--border);
+  font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.08em;
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+}
+#previewFrame{flex:1;border:none;width:100%;height:100%;}
+.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:6px;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+
+@media(max-width:900px){
+  main{grid-template-columns:1fr;}
+  .sidebar{border-right:none;border-bottom:1px solid var(--border);}
+  #editorMain{grid-template-columns:1fr;grid-template-rows:1fr 1fr;}
+  #editorPane{border-right:none;border-bottom:1px solid var(--border);}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    Lead<span>Hunt</span>
+    <small>BY KJBTRADING — BUSINESS WEBSITE FINDER</small>
+  </div>
+  <div class="header-tag">⚡ AI-Powered</div>
+</header>
+
+<main>
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div>
+      <div class="sidebar-title">Search Parameters</div>
+    </div>
+
+    <div class="field">
+      <label>Location / City</label>
+      <input type="text" id="location" placeholder="e.g. Truro, Cornwall" value="Truro, Cornwall"/>
+    </div>
+
+    <div class="field">
+      <label>Business Type</label>
+      <select id="biztype">
+        <option value="plumber">Plumbers</option>
+        <option value="electrician">Electricians</option>
+        <option value="hair salon">Hair Salons</option>
+        <option value="restaurant">Restaurants</option>
+        <option value="dentist">Dentists</option>
+        <option value="accountant">Accountants</option>
+        <option value="solicitor">Solicitors / Lawyers</option>
+        <option value="gym">Gyms / Personal Trainers</option>
+        <option value="painter decorator">Painters & Decorators</option>
+        <option value="carpenter">Carpenters / Joiners</option>
+        <option value="mechanic">Car Mechanics / Garages</option>
+        <option value="florist">Florists</option>
+        <option value="cleaning service">Cleaning Services</option>
+        <option value="landscaper">Landscapers / Gardeners</option>
+        <option value="physiotherapist">Physiotherapists</option>
+        <option value="estate agent">Estate Agents</option>
+        <option value="cafe">Cafes / Coffee Shops</option>
+        <option value="takeaway">Takeaways</option>
+        <option value="dog groomer">Dog Groomers</option>
+        <option value="chiropractor">Chiropractors</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Filter</label>
+      <select id="filter">
+        <option value="no_website">No website listed ⭐ Best leads</option>
+        <option value="all">Show all businesses</option>
+      </select>
+    </div>
+
+    <button class="search-btn" onclick="runSearch()" id="searchBtn">🔍 Find Leads</button>
+
+    <hr class="divider"/>
+
+    <div class="stat-row">
+      <div class="stat-box"><div class="n" id="statTotal">0</div><div class="l">Total Found</div></div>
+      <div class="stat-box"><div class="n" id="statLeads">0</div><div class="l">No Website</div></div>
+    </div>
+
+    <div class="info-box">
+      <strong>💡 How to use this</strong>
+      Search for businesses with no website. Click "Generate Website" on any lead. Download the HTML and use it as your pitch — offer them a ready-made site for £200–£500.
+    </div>
+  </aside>
+
+  <!-- CONTENT -->
+  <div class="content" id="content">
+    <div class="empty-state">
+      <div class="empty-icon">🗺️</div>
+      <h3>Find Your First Lead</h3>
+      <p>Enter a location and business type, then hit search. We'll find local businesses with no web presence — your ready-made prospect list.</p>
+    </div>
+  </div>
+</main>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" style="display:none;">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle">Generating Website...</h3>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter" style="display:none;">
+      <button class="copy-btn" onclick="openEditor()">✏ Edit HTML</button>
+      <button class="copy-btn" onclick="copyHTML()">Copy HTML</button>
+      <button class="dl-btn" onclick="downloadHTML()">⬇ Download Website</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDITOR OVERLAY -->
+<div id="editorOverlay">
+  <div id="editorHeader">
+    <span id="editorTitle">Website Editor</span>
+    <div class="editor-header-actions">
+      <button onclick="formatEditorCode()" title="Auto-format HTML">⌥ Format</button>
+      <button onclick="refreshPreview()">↺ Refresh Preview</button>
+      <button onclick="downloadFromEditor()">⬇ Download</button>
+      <button class="save-btn" onclick="copyFromEditor()">Copy HTML</button>
+      <button onclick="closeEditor()" style="border-color:var(--danger);color:var(--danger);">✕ Close</button>
+    </div>
+  </div>
+  <div id="editorMain">
+    <div id="editorPane">
+      <div id="editorPaneHeader">
+        <span>HTML EDITOR</span>
+        <span id="editorLineCount" style="color:var(--muted);"></span>
+      </div>
+      <textarea id="htmlEditorTextarea"></textarea>
+    </div>
+    <div id="previewPane">
+      <div id="previewPaneHeader">
+        <span><span class="live-dot"></span>LIVE PREVIEW</span>
+        <span style="color:var(--muted);font-size:10px;">Auto-updates as you type</span>
+      </div>
+      <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin"></iframe>
+    </div>
+  </div>
+</div>
+
+<script>
+// !! PASTE YOUR RENDER URL HERE AFTER SETUP !!
+const API_BASE = 'https://leadhunt-server.onrender.com';
+
+let currentHTML = '';
+let currentBiz = null;
+let allResults = [];
+
+async function runSearch() {
+  const location = document.getElementById('location').value.trim();
+  const biztype = document.getElementById('biztype').value;
+  const filter = document.getElementById('filter').value;
+
+  if (!location) { alert('Please enter a location.'); return; }
+
+  if (API_BASE.includes('YOUR-APP-NAME')) {
+    showError('⚠️ You need to set your Render server URL in the HTML file first. Open the file in a text editor, find <b>API_BASE</b> near the top of the script, and replace <b>YOUR-APP-NAME</b> with your actual Render app name.');
+    return;
+  }
+
+  const btn = document.getElementById('searchBtn');
+  btn.disabled = true; btn.textContent = 'Searching...';
+  showLoading('Searching Google Maps...');
+
+  try {
+    const query = `${biztype} in ${location}`;
+    const res = await fetch(`${API_BASE}/search?query=${encodeURIComponent(query)}`);
+    const parsed = await res.json();
+
+    if (parsed.status === 'REQUEST_DENIED') {
+      showError('API key error: ' + (parsed.error_message || 'Check your Google Cloud Console.'));
+      return;
+    }
+    if (!parsed.results || parsed.results.length === 0) {
+      showError('No results found. Try a different location or business type.');
+      return;
+    }
+
+    allResults = parsed.results;
+    showLoading(`Found ${allResults.length} businesses. Checking for websites...`);
+
+    const detailed = await Promise.all(
+      allResults.slice(0, 20).map(p => getPlaceDetails(p.place_id))
+    );
+
+    const leads = detailed.filter(Boolean);
+    const noWebsite = leads.filter(p => !p.website);
+
+    document.getElementById('statTotal').textContent = leads.length;
+    document.getElementById('statLeads').textContent = noWebsite.length;
+
+    const toShow = filter === 'no_website' ? noWebsite : leads;
+    renderResults(toShow, filter === 'no_website', biztype, location);
+
+  } catch(e) {
+    showError(`Search failed: ${e.message}<br><br>Make sure your Render server is running and the URL in the file is correct.`);
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 Find Leads';
+  }
+}
+
+async function getPlaceDetails(placeId) {
+  try {
+    const res = await fetch(`${API_BASE}/details?place_id=${placeId}`);
+    const parsed = await res.json();
+    return parsed.result || null;
+  } catch { return null; }
+}
+
+function renderResults(places, noWebsiteMode, biztype, location) {
+  if (places.length === 0) {
+    document.getElementById('content').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🎉</div>
+        <h3>${noWebsiteMode ? 'No leads found' : 'No results'}</h3>
+        <p>${noWebsiteMode ? 'All businesses in this area already have websites listed. Try a different area or business type.' : 'No businesses found for this search.'}</p>
+      </div>`;
+    return;
+  }
+
+  const rows = places.map(p => {
+    const hasWebsite = !!p.website;
+    const stars = p.rating ? '⭐ ' + p.rating + ` (${p.user_ratings_total || 0})` : 'No rating';
+    const phone = p.formatted_phone_number || 'No phone listed';
+    const addr = p.formatted_address || '';
+
+    return `
+    <div class="biz-card" onclick="">
+      <div>
+        <div class="biz-name">${escHtml(p.name)}</div>
+        <div class="biz-meta">📍 ${escHtml(addr)}<br>📞 ${phone}</div>
+        <div class="biz-tags">
+          ${!hasWebsite ? '<span class="badge badge-green no-website-flag">✦ NO WEBSITE</span>' : '<span class="badge badge-yellow">Has website</span>'}
+          <span class="rating">${stars}</span>
+        </div>
+      </div>
+      <div class="biz-actions">
+        <button class="gen-btn" onclick="generateWebsite(${JSON.stringify(p).replace(/"/g, '&quot;')}, '${escHtml(biztype)}')">Generate Website →</button>
+        <button class="brand-btn" onclick="generateBranding(${JSON.stringify(p).replace(/"/g, '&quot;')}, '${escHtml(biztype)}')">✦ Branding Package</button>
+        <a href="https://www.google.com/search?q=${encodeURIComponent(p.name + ' ' + (p.formatted_address || ''))}" target="_blank" style="font-size:11px;color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:4px;">🔍 Google ↗</a>
+        ${p.website ? `<a href="${p.website}" target="_blank" style="font-size:11px;color:var(--muted);text-decoration:none;">View existing ↗</a>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('content').innerHTML = `
+    <div class="results-header">
+      <h2>${places.length} ${noWebsiteMode ? 'leads with no website' : 'businesses'} in ${escHtml(location)}</h2>
+      <span style="font-size:13px;color:var(--muted);">Click "Generate Website" to build a site for any lead</span>
+    </div>
+    <div class="results-list">${rows}</div>`;
+}
+
+async function generateWebsite(biz, biztype) {
+  currentBiz = biz;
+  openModal(biz.name);
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="modal-loading">
+      <div class="spinner"></div>
+      <p>Gathering business data...</p>
+      <p style="font-size:12px;margin-top:4px;opacity:0.5;">Fetching opening hours, reviews, social media...</p>
+    </div>`;
+  document.getElementById('modalFooter').style.display = 'none';
+
+  // Fetch rich details including hours, reviews, photos
+  let richData = biz;
+  try {
+    const detailRes = await fetch(`${API_BASE}/details?place_id=${biz.place_id || ''}`);
+    const detailJson = await detailRes.json();
+    if (detailJson.result) richData = { ...biz, ...detailJson.result };
+  } catch(e) {}
+
+  // Get Google photo URLs
+  document.querySelector('.modal-loading p').textContent = 'Fetching business photos...';
+  const photoUrls = [];
+  if (richData.photos && richData.photos.length > 0) {
+    const photoRefs = richData.photos.slice(0, 3);
+    for (const p of photoRefs) {
+      try {
+        const pr = await fetch(`${API_BASE}/photo?ref=${p.photo_reference}&maxwidth=1200`);
+        const pj = await pr.json();
+        if (pj.photo_url) photoUrls.push(pj.photo_url);
+      } catch(e) {}
+    }
+  }
+
+  // Try to scrape existing website for social media, email, logo
+  let scraped = {};
+  if (richData.website) {
+    document.querySelector('.modal-loading p').textContent = 'Scanning existing web presence...';
+    try {
+      const scrapeRes = await fetch(`${API_BASE}/scrape?url=${encodeURIComponent(richData.website)}`);
+      scraped = await scrapeRes.json();
+    } catch(e) {}
+  }
+
+  // Generate SVG logo if none found
+  document.querySelector('.modal-loading p').textContent = 'Designing logo...';
+  let logoSvg = '';
+  if (!scraped.logo) {
+    try {
+      const logoRes = await fetch(`${API_BASE}/generate-logo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: richData.name, biztype })
+      });
+      const logoJson = await logoRes.json();
+      logoSvg = logoJson.svg || '';
+    } catch(e) {}
+  }
+
+  document.querySelector('.modal-loading p').textContent = `Building website for ${biz.name}...`;
+
+  // Build opening hours string
+  const hoursText = richData.opening_hours?.weekday_text?.join('\n') || 'Contact us for opening hours';
+
+  // Build reviews summary
+  const reviews = (richData.reviews || []).slice(0, 3).map(r =>
+    `"${r.text?.substring(0,150)}" — ${r.author_name} (${r.rating}★)`
+  ).join('\n');
+
+  // Build social media info
+  const socials = [];
+  if (scraped.instagram) socials.push(`Instagram: ${scraped.instagram}`);
+  if (scraped.facebook) socials.push(`Facebook: ${scraped.facebook}`);
+  if (scraped.tiktok) socials.push(`TikTok: ${scraped.tiktok}`);
+  if (scraped.email) socials.push(`Email: ${scraped.email}`);
+
+  const prompt = `You are an expert web developer. Generate a complete, single-file HTML website for a local business using ALL the real data provided below.
+
+BUSINESS DATA:
+- Name: ${richData.name}
+- Type: ${biztype}
+- Address: ${richData.formatted_address || 'Local business'}
+- Phone: ${richData.formatted_phone_number || richData.international_phone_number || 'Contact us'}
+- Rating: ${richData.rating || 'N/A'} stars from ${richData.user_ratings_total || 0} reviews
+- Business description: ${scraped.description || richData.editorial_summary?.overview || 'Professional local ' + biztype}
+- Opening hours:\n${hoursText}
+${reviews ? '- Real customer reviews:\n' + reviews : ''}
+${socials.length ? '- Social media:\n' + socials.join('\n') : ''}
+${richData.delivery ? '- Offers delivery' : ''}
+${richData.takeout ? '- Offers takeaway' : ''}
+${richData.reservable ? '- Takes reservations' : ''}
+${photoUrls.length ? '- Real business photos (use as img src in hero/about sections):\n' + photoUrls.join('\n') : ''}
+${scraped.logo ? '- Logo image URL: ' + scraped.logo : ''}
+${logoSvg ? '- Generated SVG logo (embed this directly in the HTML where the logo appears):\n' + logoSvg : ''}
+
+REQUIREMENTS:
+- Single HTML file with embedded CSS and JS
+- Professional, modern design for a ${biztype} business
+- Include ALL real data above — hours, phone, address, reviews, social links
+- ${photoUrls.length ? 'Use the real business photos as hero background and in the about/gallery section using <img> tags with the provided URLs' : 'Use CSS gradients for hero background — no placeholder images'}
+- ${scraped.logo ? 'Use the provided logo image URL in the header' : logoSvg ? 'Embed the provided SVG logo directly in the header — do not use an img tag for it' : 'Create a clean text-based logo in the header'}
+- Sections: Hero, About, Services, Opening Hours, Reviews (use the real ones), Contact
+- If social media links exist, show real clickable links in footer and header
+- Phone number must be a clickable tel: link
+- Mobile responsive
+- Use Google Fonts (load from CDN)
+- Color scheme appropriate for a ${biztype}
+- ALL nav links use anchor links only (href="#about" etc) — never external URLs
+- Logo/home link uses href="#" only
+- Smooth scroll navigation
+- Output ONLY raw HTML, no markdown, no explanation`;
+
+  try {
+    const response = await fetch(`${API_BASE}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await response.json();
+
+    if (data.error) {
+      throw new Error(JSON.stringify(data.error));
+    }
+    if (!data.content) {
+      throw new Error('No content returned. Full response: ' + JSON.stringify(data));
+    }
+
+    let html = data.content.map(b => b.text || '').join('');
+    html = html.replace(/```html/g, '').replace(/```/g, '').trim();
+
+    if (!html) {
+      throw new Error('Empty HTML generated. Response: ' + JSON.stringify(data));
+    }
+
+    currentHTML = html;
+    showPreview(html, biz.name);
+
+  } catch(e) {
+    document.getElementById('modalBody').innerHTML = `
+      <div class="error-box">
+        <strong>Generation failed</strong><br><br>
+        ${e.message}
+      </div>`;
+  }
+}
+
+async function generateBranding(biz, biztype) {
+  currentBiz = biz;
+  openModal(biz.name + ' — Branding Package');
+
+  document.getElementById('modalBody').innerHTML = `
+    <div class="modal-loading">
+      <div class="spinner"></div>
+      <p>Building branding package...</p>
+      <p style="font-size:12px;margin-top:4px;opacity:0.5;">Logo, colours, business card, banners, social media...</p>
+    </div>`;
+  document.getElementById('modalFooter').style.display = 'none';
+
+  const prompt = `You are a professional brand designer. Create a complete, single-file HTML branding kit for the following business. Everything must be embedded in one HTML file using only SVG and CSS — no external images or fonts except Google Fonts loaded from CDN.
+
+BUSINESS:
+- Name: ${biz.name}
+- Type: ${biztype}
+- Address: ${biz.formatted_address || ''}
+- Phone: ${biz.formatted_phone_number || ''}
+- Rating: ${biz.rating || 'N/A'} stars
+
+OUTPUT a single HTML page that acts as a visual branding kit with the following sections, clearly labelled:
+
+1. BRAND IDENTITY
+   - Primary logo (SVG, horizontal layout with icon + wordmark)
+   - Icon/favicon version (SVG, square, icon only)
+   - Logo on dark background variant
+   - Logo on light background variant
+
+2. COLOUR PALETTE
+   - 5 brand colours with hex codes, names, and usage notes (Primary, Secondary, Accent, Light, Dark)
+   - Show large swatches
+
+3. TYPOGRAPHY
+   - Heading font + body font recommendation (from Google Fonts)
+   - Show type scale: H1, H2, H3, body, caption with example text
+
+4. BUSINESS CARD
+   - Front and back, realistic card dimensions (85×54mm ratio), fully designed with logo, name, phone, address, website placeholder
+
+5. SOCIAL MEDIA TEMPLATES (show as visual mockups)
+   - Profile picture (1:1, 400×400)
+   - Facebook/LinkedIn cover banner (16:3 ratio)
+   - Instagram post (1:1, 1080×1080 scaled down)
+   - Instagram story (9:16 ratio, scaled down)
+
+6. POSTER / FLYER
+   - A5 portrait promotional poster with logo, tagline, contact info
+
+7. EMAIL SIGNATURE
+   - HTML email signature snippet with logo, name, title, phone, website
+
+DESIGN REQUIREMENTS:
+- Derive a professional colour palette and style appropriate for a ${biztype} business
+- All assets must use the same consistent brand identity (same colours, fonts, logo)
+- Use SVG for all graphics — no placeholder boxes, fully designed
+- Each section should have a dark section header label
+- The page itself should have a clean white/light grey background for easy screenshotting
+- Output ONLY raw HTML, no markdown, no explanation`;
+
+  try {
+    const response = await fetch(`${API_BASE}/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt })
+    });
+    const data = await response.json();
+
+    if (data.error) throw new Error(JSON.stringify(data.error));
+    if (!data.content) throw new Error('No content returned.');
+
+    let html = data.content.map(b => b.text || '').join('');
+    html = html.replace(/```html/g, '').replace(/```/g, '').trim();
+    if (!html) throw new Error('Empty branding package generated.');
+
+    currentHTML = html;
+    showBrandingPreview(biz.name);
+
+  } catch(e) {
+    document.getElementById('modalBody').innerHTML = `
+      <div class="error-box">
+        <strong>Generation failed</strong><br><br>${e.message}
+      </div>`;
+  }
+}
+
+function showBrandingPreview(name) {
+  document.getElementById('modalBody').innerHTML = `
+    <div style="text-align:center;padding:40px 20px;">
+      <div style="font-size:48px;margin-bottom:16px;">🎨</div>
+      <h3 style="font-family:'Syne',sans-serif;font-size:20px;margin-bottom:12px;color:#C4B5FD;">Branding Package Ready!</h3>
+      <p style="color:var(--muted);font-size:14px;margin-bottom:8px;">Full brand kit for <strong style="color:var(--text);">${escHtml(name)}</strong> is ready.</p>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:32px;">Download the HTML file — open in Chrome to view and screenshot all assets.</p>
+      <div style="background:rgba(124,58,237,0.08);border:1px solid rgba(124,58,237,0.25);border-radius:6px;padding:16px;text-align:left;">
+        <p style="font-size:11px;color:var(--muted);margin-bottom:6px;font-family:'DM Mono',monospace;letter-spacing:0.05em;">INCLUDED IN PACKAGE</p>
+        <p style="font-size:13px;color:rgba(200,180,255,0.8);line-height:1.8;">✦ Logo (horizontal + icon)<br>✦ Colour palette with hex codes<br>✦ Typography scale<br>✦ Business card (front & back)<br>✦ Social media templates<br>✦ Poster / flyer<br>✦ Email signature</p>
+      </div>
+    </div>`;
+  document.getElementById('modalFooter').style.display = 'flex';
+}
+
+function showPreview(html, name) {
+  const slug = name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  document.getElementById('modalBody').innerHTML = `
+    <div style="text-align:center;padding:40px 20px;">
+      <div style="font-size:48px;margin-bottom:16px;">✅</div>
+      <h3 style="font-family:'Syne',sans-serif;font-size:20px;margin-bottom:12px;color:var(--accent);">Website Generated!</h3>
+      <p style="color:var(--muted);font-size:14px;margin-bottom:8px;">A professional website for <strong style="color:var(--text);">${escHtml(name)}</strong> is ready.</p>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:32px;">Download it, open in Chrome to preview, then pitch it to the business.</p>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:16px;text-align:left;">
+        <p style="font-size:11px;color:var(--muted);margin-bottom:6px;font-family:'DM Mono',monospace;letter-spacing:0.05em;">SUGGESTED DOMAIN</p>
+        <p style="font-size:15px;color:var(--accent);font-family:'DM Mono',monospace;">www.${slug}.co.uk</p>
+      </div>
+      <div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.15);border-radius:6px;padding:16px;text-align:left;">
+        <p style="font-size:11px;color:var(--muted);margin-bottom:6px;font-family:'DM Mono',monospace;letter-spacing:0.05em;">PITCH TIP</p>
+        <p style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.6;">Download the file, open in Chrome to preview, call the business, offer to go live for £200-£500</p>
+      </div>
+    </div>`;
+  document.getElementById('modalFooter').style.display = 'flex';
+}
+
+function openModal(name) {
+  document.getElementById('modalTitle').textContent = `Website for: ${name}`;
+  document.getElementById('modal').style.display = 'flex';
+}
+function closeModal() {
+  document.getElementById('modal').style.display = 'none';
+  currentHTML = '';
+}
+
+function copyHTML() {
+  navigator.clipboard.writeText(currentHTML).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = 'Copy HTML', 2000);
+  });
+}
+
+function downloadHTML() {
+  if (!currentHTML) return;
+  const name = currentBiz ? currentBiz.name.toLowerCase().replace(/\s+/g,'-') : 'file';
+  const isBranding = document.getElementById('modalTitle').textContent.includes('Branding');
+  const suffix = isBranding ? 'branding-kit' : 'website';
+  const blob = new Blob([currentHTML], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${name}-${suffix}.html`;
+  a.click();
+}
+
+function showLoading(msg) {
+  document.getElementById('content').innerHTML = `
+    <div class="loading">
+      <div class="spinner"></div>
+      <p>${msg}</p>
+    </div>`;
+}
+
+function showError(msg) {
+  document.getElementById('content').innerHTML = `
+    <div style="padding:40px;">
+      <div class="error-box">${msg}</div>
+    </div>`;
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (document.getElementById('editorOverlay').style.display === 'flex') closeEditor();
+    else closeModal();
+  }
+});
+
+// ── EDITOR ─────────────────────────────────────────────────────────────────
+let editorCM = null;
+let previewDebounce = null;
+
+function openEditor() {
+  if (!currentHTML) return;
+  const overlay = document.getElementById('editorOverlay');
+  const name = currentBiz ? currentBiz.name : 'Website';
+  document.getElementById('editorTitle').textContent = `Editing: ${name}`;
+  overlay.style.display = 'flex';
+
+  if (!editorCM) {
+    editorCM = CodeMirror.fromTextArea(document.getElementById('htmlEditorTextarea'), {
+      mode: 'htmlmixed',
+      theme: 'dracula',
+      lineNumbers: true,
+      lineWrapping: false,
+      autofocus: true,
+      tabSize: 2,
+      indentWithTabs: false,
+      extraKeys: { 'Ctrl-Space': 'autocomplete' }
+    });
+    editorCM.on('change', () => {
+      clearTimeout(previewDebounce);
+      previewDebounce = setTimeout(refreshPreview, 600);
+      document.getElementById('editorLineCount').textContent =
+        editorCM.lineCount() + ' lines';
+    });
+    // Make CodeMirror fill the pane
+    editorCM.getWrapperElement().style.cssText =
+      'flex:1;overflow:hidden;height:calc(100vh - 100px);';
+  }
+
+  editorCM.setValue(currentHTML);
+  editorCM.clearHistory();
+  document.getElementById('editorLineCount').textContent =
+    editorCM.lineCount() + ' lines';
+  setTimeout(() => { editorCM.refresh(); refreshPreview(); }, 50);
+}
+
+function refreshPreview() {
+  const html = editorCM ? editorCM.getValue() : currentHTML;
+  const frame = document.getElementById('previewFrame');
+  frame.srcdoc = html;
+}
+
+function formatEditorCode() {
+  if (!editorCM) return;
+  // Simple indent cleanup — reflows the value through a formatter
+  const val = editorCM.getValue();
+  editorCM.setValue(val); // no-op visually, but triggers re-render
+  // Cursor to top
+  editorCM.setCursor({line:0, ch:0});
+}
+
+function downloadFromEditor() {
+  const html = editorCM ? editorCM.getValue() : currentHTML;
+  if (!html) return;
+  const name = currentBiz ? currentBiz.name.toLowerCase().replace(/\s+/g,'-') : 'website';
+  const blob = new Blob([html], {type:'text/html'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${name}-edited.html`;
+  a.click();
+}
+
+function copyFromEditor() {
+  const html = editorCM ? editorCM.getValue() : currentHTML;
+  navigator.clipboard.writeText(html).then(() => {
+    const btn = document.querySelector('.editor-header-actions .save-btn');
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = 'Copy HTML', 2000);
+  });
+}
+
+function closeEditor() {
+  document.getElementById('editorOverlay').style.display = 'none';
+  // Sync any edits back to currentHTML so download from modal stays fresh
+  if (editorCM) currentHTML = editorCM.getValue();
+}
+</script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/xml/xml.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/css/css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/htmlmixed/htmlmixed.min.js"></script>
+</body>
+</html>
