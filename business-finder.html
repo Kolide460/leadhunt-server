@@ -298,6 +298,13 @@ iframe{width:100%;height:480px;border:none;background:#fff;}
       <strong>💡 How to use this</strong>
       Search for businesses with no website. Click "Generate Website" on any lead. Download the HTML and use it as your pitch — offer them a ready-made site for £200–£500.
     </div>
+
+    <hr class="divider"/>
+
+    <div>
+      <div class="sidebar-title" style="margin-bottom:10px;">🧪 Dev Testing</div>
+      <button class="search-btn" style="background:var(--accent2);color:#fff;" onclick="loadTestBusiness()">Load Wingshed Truro</button>
+    </div>
   </aside>
 
   <!-- CONTENT -->
@@ -363,6 +370,45 @@ const API_BASE = 'https://leadhunt-server.onrender.com';
 let currentHTML = '';
 let currentBiz = null;
 let allResults = [];
+
+// ── TEST FIXTURE ────────────────────────────────────────────────────────────
+const TEST_BUSINESS = {
+  name: 'Wingshed Truro',
+  formatted_address: 'Gloweth, Truro, Cornwall TR1 3XX',
+  formatted_phone_number: '01872 000000',
+  international_phone_number: '+44 1872 000000',
+  website: null,
+  rating: 4.5,
+  user_ratings_total: 87,
+  place_id: 'TEST_WINGSHED_TRURO',
+  opening_hours: {
+    weekday_text: [
+      'Monday: Closed',
+      'Tuesday: 12:00 – 10:00 PM',
+      'Wednesday: 12:00 – 10:00 PM',
+      'Thursday: 12:00 – 10:00 PM',
+      'Friday: 12:00 – 11:00 PM',
+      'Saturday: 12:00 – 11:00 PM',
+      'Sunday: 12:00 – 9:00 PM'
+    ]
+  },
+  reviews: [
+    { author_name: 'James H.', rating: 5, text: 'Best wings in Cornwall by a mile. Crispy, saucy, massive portions. Will be back every week.' },
+    { author_name: 'Sarah M.', rating: 5, text: 'Absolutely loved it. Great atmosphere, friendly staff, and the loaded fries are unreal.' },
+    { author_name: 'Tom B.', rating: 4, text: 'Solid spot for wings and a cold pint. Parking nearby and easy to find in Gloweth.' }
+  ],
+  photos: [],
+  delivery: true,
+  takeout: true,
+  reservable: false,
+  editorial_summary: { overview: 'Local chicken wing restaurant and bar serving American-style wings, loaded fries, and craft beers in Gloweth, Truro.' }
+};
+
+function loadTestBusiness() {
+  document.getElementById('statTotal').textContent = 1;
+  document.getElementById('statLeads').textContent = 1;
+  renderResults([TEST_BUSINESS], true, 'restaurant', 'Truro, Cornwall');
+}
 
 async function runSearch() {
   const location = document.getElementById('location').value.trim();
@@ -481,13 +527,15 @@ async function generateWebsite(biz, biztype) {
     </div>`;
   document.getElementById('modalFooter').style.display = 'none';
 
-  // Fetch rich details including hours, reviews, photos
+  // Fetch rich details including hours, reviews, photos (skip for test fixtures)
   let richData = biz;
-  try {
-    const detailRes = await fetch(`${API_BASE}/details?place_id=${biz.place_id || ''}`);
-    const detailJson = await detailRes.json();
-    if (detailJson.result) richData = { ...biz, ...detailJson.result };
-  } catch(e) {}
+  if (biz.place_id && !biz.place_id.startsWith('TEST_')) {
+    try {
+      const detailRes = await fetch(`${API_BASE}/details?place_id=${biz.place_id || ''}`);
+      const detailJson = await detailRes.json();
+      if (detailJson.result) richData = { ...biz, ...detailJson.result };
+    } catch(e) {}
+  }
 
   // Get Google photo URLs
   document.querySelector('.modal-loading p').textContent = 'Fetching business photos...';
