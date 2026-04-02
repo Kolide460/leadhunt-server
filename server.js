@@ -42,7 +42,21 @@ app.get('/details', async (req, res) => {
   }
 });
 
-// Scrape business website for social media, email, description
+// Get a Google Places photo URL
+app.get('/photo', async (req, res) => {
+  try {
+    const { ref, maxwidth } = req.query;
+    const w = maxwidth || 1200;
+    const url = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=${w}&photo_reference=${ref}&key=${PLACES_KEY}`;
+    const response = await fetch(url);
+    // Google redirects to the actual image
+    res.json({ photo_url: response.url });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Scrape existing website for logo, social media, email
 app.get('/scrape', async (req, res) => {
   try {
     const { url } = req.query;
@@ -62,7 +76,7 @@ app.get('/scrape', async (req, res) => {
       tiktok: extractSocial(html, 'tiktok.com'),
       email: extractEmail(html),
       description: extractDescription(html),
-      logo: extractLogo(html, url),
+      logo: extractBestLogo(html, url),
     };
 
     res.json(extracted);
@@ -88,13 +102,73 @@ function extractDescription(html) {
   return m ? m[1].substring(0, 400) : null;
 }
 
-function extractLogo(html, baseUrl) {
-  const m = html.match(/<link[^>]+rel=["'](?:shortcut )?icon["'][^>]+href=["']([^"']+)["']/i);
-  if (!m) return null;
-  const href = m[1];
+function extractBestLogo(html, baseUrl) {
+  // Try og:image first (usually highest quality)
+  const ogImage = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+    || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+  if (ogImage && ogImage[1]) return resolveUrl(ogImage[1], baseUrl);
+
+  // Try to find a logo img tag
+  const logoImg = html.match(/<img[^>]+(?:class|id|alt)=["'][^"']*logo[^"']*["'][^>]+src=["']([^"']+)["']/i)
+    || html.match(/<img[^>]+src=["']([^"']*logo[^"']*)["']/i);
+  if (logoImg && logoImg[1]) return resolveUrl(logoImg[1], baseUrl);
+
+  // Fall back to favicon
+  const favicon = html.match(/<link[^>]+rel=["'](?:shortcut )?icon["'][^>]+href=["']([^"']+)["']/i);
+  if (favicon && favicon[1]) return resolveUrl(favicon[1], baseUrl);
+
+  return null;
+}
+
+function resolveUrl(href, baseUrl) {
+  if (!href) return null;
   if (href.startsWith('http')) return href;
   try { return new URL(href, baseUrl).href; } catch { return null; }
 }
+
+// Generate SVG logo using Claude
+app.post('/generate-logo', async (req, res) => {
+  try {
+    const { name, biztype, colors } = req.body;
+    if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not set' });
+
+    const prompt = `Design a professional SVG logo for a ${biztype} business called "${name}".
+
+Requirements:
+- Output ONLY a valid SVG element, nothing else — no explanation, no markdown, no backticks
+- The SVG should be viewBox="0 0 300 100" (wide format, like a header logo)
+- Include a small relevant icon/symbol on the left (e.g. a wrench for plumber, scissors for hair salon, flame for restaurant)
+- Business name text on the right of the icon
+- Use colors appropriate for a ${biztype} business: ${colors || 'professional and trustworthy'}
+- Clean, modern, professional design
+- Icon should be a proper geometric SVG shape — NOT just an emoji or letter
+- Font: use a system sans-serif font or embed a simple geometric font style with SVG paths
+- The whole logo must work on both light and dark backgrounds
+- Keep it simple and scalable
+- Output the raw SVG starting with <svg and ending with </svg>`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-5',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await response.json();
+    let svg = data.content?.map(b => b.text || '').join('') || '';
+    svg = svg.replace(/```svg/g, '').replace(/```xml/g, '').replace(/```/g, '').trim();
+    res.json({ svg });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
 // Debug
 app.get('/debug', (req, res) => {
