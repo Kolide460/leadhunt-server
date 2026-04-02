@@ -37,25 +37,29 @@ app.get('/details', async (req, res) => {
 });
 
 // AI Image generation — proxies Pollinations.ai and returns base64 data URI
+// Falls back gracefully: always returns the direct URL so the browser can load it
 app.get('/generate-image', async (req, res) => {
+  const { prompt, w = 400, h = 400, seed = 42 } = req.query;
+  const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&model=flux&seed=${seed}`;
+
   try {
-    const { prompt, w = 400, h = 400, seed = 42 } = req.query;
-    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&model=flux&seed=${seed}`;
+    const fetchPromise = fetch(pollinationsUrl);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Pollinations timeout after 25s')), 25000)
+    );
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 55000);
+    const response = await Promise.race([fetchPromise, timeoutPromise]);
 
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timer);
-
-    if (!response.ok) throw new Error(`Pollinations returned ${response.status}`);
+    if (!response.ok) throw new Error(`Pollinations HTTP ${response.status}`);
 
     const buffer = await response.arrayBuffer();
     const base64 = Buffer.from(buffer).toString('base64');
     const mime = response.headers.get('content-type') || 'image/jpeg';
-    res.json({ dataUri: `data:${mime};base64,${base64}` });
+    res.json({ dataUri: `data:${mime};base64,${base64}`, url: pollinationsUrl });
   } catch(e) {
-    res.status(500).json({ error: e.message });
+    console.error('[generate-image] failed:', e.message, '| prompt:', prompt.substring(0, 60));
+    // Return the direct URL as fallback — browser can load it even if server-side proxy failed
+    res.json({ error: e.message, url: pollinationsUrl });
   }
 });
 

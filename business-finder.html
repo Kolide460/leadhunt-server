@@ -703,38 +703,24 @@ async function generateBranding(biz, biztype) {
   let done = 0;
   const imgMap = {};
 
-  // First check the endpoint actually exists on the backend
-  try {
-    const check = await fetch(`${API_BASE}/generate-image?prompt=test&w=32&h=32&seed=1`);
-    if (!check.ok && check.status === 404) {
-      throw new Error('Backend /generate-image endpoint not found (404) — Render may still be deploying. Wait 2–3 minutes and try again.');
-    }
-  } catch(e) {
-    document.getElementById('modalBody').innerHTML = `<div style="padding:32px"><div class="error-box"><strong>Image generation unavailable</strong><br><br>${e.message}</div></div>`;
-    return;
-  }
-
   await Promise.all(tokens.map(async token => {
     const { prompt: p, w, h } = imgDefs[token];
     try {
       const r = await fetch(`${API_BASE}/generate-image?prompt=${encodeURIComponent(p)}&w=${w}&h=${h}&seed=${seed}`);
       const j = await r.json();
-      if (j.error) throw new Error(j.error);
-      imgMap[token] = j.dataUri || null;
+      // Use embedded base64 if proxy succeeded, otherwise fall back to direct Pollinations URL
+      imgMap[token] = j.dataUri || j.url || null;
+      if (j.error) console.warn(`Image proxy failed for ${token} (using direct URL):`, j.error);
     } catch(e) {
-      console.warn(`Image failed for ${token}:`, e.message);
-      imgMap[token] = null;
+      // If backend is totally unreachable, build the Pollinations URL client-side as last resort
+      console.warn(`Image fetch failed for ${token}:`, e.message);
+      imgMap[token] = `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=${w}&height=${h}&nologo=true&model=flux&seed=${seed}`;
     }
     done++;
-    setStatus(`Generating AI images... ${done}/${tokens.length}`, `${token.replace('BRAND_IMG_', '')} complete`);
+    setStatus(`Generating AI images... ${done}/${tokens.length}`, `${token.replace('BRAND_IMG_', '')} done`);
   }));
 
-  const failedCount = Object.values(imgMap).filter(v => !v).length;
-  if (failedCount === tokens.length) {
-    document.getElementById('modalBody').innerHTML = `<div style="padding:32px"><div class="error-box"><strong>All images failed to generate</strong><br><br>The backend image generation endpoint may be unavailable. Check the Render logs.</div></div>`;
-    return;
-  }
-  setStatus('Building branding kit...', failedCount ? `${failedCount} image(s) failed — will use placeholders` : 'All images ready — assembling with Claude');
+  setStatus('Building branding kit...', 'Images ready — assembling with Claude');
 
   // Prompt uses only safe token names — no URLs, no & characters
   const prompt = `You are a senior brand designer. Build a complete single-file HTML branding kit. Use the placeholder tokens EXACTLY as written — they will be replaced with real AI images after generation.
