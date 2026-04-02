@@ -682,25 +682,42 @@ async function generateBranding(biz, biztype) {
       </div>`;
   }
 
-  setStatus('Generating AI brand images...', 'Flux AI is rendering your assets — takes 20–40 seconds');
+  setStatus('Generating AI brand images...', 'Flux AI is rendering your assets — this takes 30–60 seconds');
 
   const seed = Math.floor(Math.random() * 99999);
   const style = `professional ${biztype} business, Cornwall UK, high quality, cinematic`;
 
-  // Map of short safe placeholder tokens → actual Pollinations URLs
-  // Claude only ever sees the tokens (no & chars to mangle).
-  // After generation we do a plain string-replace to inject the real URLs.
-  const imgMap = {
-    'BRAND_IMG_LOGO':    pollinationsUrl(`minimalist professional logo icon mark for ${biztype} business, clean bold symbol, no text, no letters, white background, flat design, vector art style`, 400, 400, seed),
-    'BRAND_IMG_LOGODARK':pollinationsUrl(`minimalist professional logo icon mark for ${biztype} business, clean bold symbol, no text, no letters, dark navy background, white icon, flat design, vector art style`, 400, 400, seed + 1),
-    'BRAND_IMG_BANNER':  pollinationsUrl(`wide cinematic hero background for ${biztype} business, ${style}, moody atmospheric lighting, no text, no people, suitable for text overlay`, 900, 300, seed),
-    'BRAND_IMG_IGPOST':  pollinationsUrl(`square social media background for ${biztype} business, ${style}, food or product photography, warm tones, no text`, 600, 600, seed),
-    'BRAND_IMG_IGSTORY': pollinationsUrl(`vertical portrait background for ${biztype} business, ${style}, dramatic lighting, atmospheric, no text`, 400, 700, seed),
-    'BRAND_IMG_POSTER':  pollinationsUrl(`bold promotional poster background for ${biztype} business in Cornwall, dramatic photography, rich colours, no text, suitable for text overlay`, 420, 595, seed),
-    'BRAND_IMG_BIZCARD': pollinationsUrl(`premium luxury background texture for ${biztype} business card, dark rich tones, subtle pattern, no text`, 500, 300, seed),
+  // Image definitions: token → {prompt, w, h}
+  const imgDefs = {
+    'BRAND_IMG_LOGO':     { prompt: `minimalist professional logo icon mark for ${biztype} business, clean bold symbol, no text, no letters, white background, flat design, vector art style`, w: 300, h: 300 },
+    'BRAND_IMG_LOGODARK': { prompt: `minimalist professional logo icon mark for ${biztype} business, clean bold symbol, no text, no letters, dark navy background, white icon, flat design, vector art style`, w: 300, h: 300 },
+    'BRAND_IMG_BANNER':   { prompt: `wide cinematic hero background for ${biztype} business, ${style}, moody atmospheric lighting, no text, no people, suitable for text overlay`, w: 800, h: 267 },
+    'BRAND_IMG_IGPOST':   { prompt: `square social media background for ${biztype} business, ${style}, food or product photography, warm tones, no text`, w: 500, h: 500 },
+    'BRAND_IMG_IGSTORY':  { prompt: `vertical portrait background for ${biztype} business, ${style}, dramatic lighting, atmospheric, no text`, w: 300, h: 533 },
+    'BRAND_IMG_POSTER':   { prompt: `bold promotional poster background for ${biztype} business in Cornwall, dramatic photography, rich colours, no text, suitable for text overlay`, w: 350, h: 495 },
+    'BRAND_IMG_BIZCARD':  { prompt: `premium luxury background texture for ${biztype} business card, dark rich tones, subtle pattern, no text`, w: 400, h: 240 },
   };
 
-  setStatus('AI images queued — building branding kit with Claude...', 'Almost there');
+  // Fetch all images in parallel through the backend (returns base64 data URIs)
+  const tokens = Object.keys(imgDefs);
+  let done = 0;
+  const imgMap = {};
+
+  await Promise.all(tokens.map(async token => {
+    const { prompt: p, w, h } = imgDefs[token];
+    try {
+      const r = await fetch(`${API_BASE}/generate-image?prompt=${encodeURIComponent(p)}&w=${w}&h=${h}&seed=${seed}`);
+      const j = await r.json();
+      imgMap[token] = j.dataUri || null;
+    } catch(e) {
+      imgMap[token] = null;
+    }
+    done++;
+    setStatus(`Generating AI images... ${done}/${tokens.length}`, `${token.replace('BRAND_IMG_','')} done`);
+  }));
+
+  const failedCount = Object.values(imgMap).filter(v => !v).length;
+  setStatus('Building branding kit...', failedCount ? `${failedCount} image(s) failed — will use placeholders` : 'All images ready — assembling with Claude');
 
   // Prompt uses only safe token names — no URLs, no & characters
   const prompt = `You are a senior brand designer. Build a complete single-file HTML branding kit. Use the placeholder tokens EXACTLY as written — they will be replaced with real AI images after generation.
@@ -785,9 +802,10 @@ Output ONLY raw HTML starting with <!DOCTYPE html>.`;
     html = html.replace(/```html/g, '').replace(/```/g, '').trim();
     if (!html) throw new Error('Empty branding package generated.');
 
-    // Inject real image URLs in place of tokens — done here in JS, never through Claude
-    for (const [token, url] of Object.entries(imgMap)) {
-      html = html.split(token).join(url);
+    // Inject base64 data URIs in place of tokens — done in JS, never through Claude
+    for (const [token, dataUri] of Object.entries(imgMap)) {
+      const value = dataUri || 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs='; // 1px transparent fallback
+      html = html.split(token).join(value);
     }
 
     currentHTML = html;

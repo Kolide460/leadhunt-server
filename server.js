@@ -36,4 +36,27 @@ app.get('/details', async (req, res) => {
   }
 });
 
+// AI Image generation — proxies Pollinations.ai and returns base64 data URI
+app.get('/generate-image', async (req, res) => {
+  try {
+    const { prompt, w = 400, h = 400, seed = 42 } = req.query;
+    const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&model=flux&seed=${seed}`;
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 55000);
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+
+    if (!response.ok) throw new Error(`Pollinations returned ${response.status}`);
+
+    const buffer = await response.arrayBuffer();
+    const base64 = Buffer.from(buffer).toString('base64');
+    const mime = response.headers.get('content-type') || 'image/jpeg';
+    res.json({ dataUri: `data:${mime};base64,${base64}` });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
