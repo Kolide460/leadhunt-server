@@ -138,7 +138,7 @@ Requirements:
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: 'claude-sonnet-4-6',
         max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }]
       })
@@ -159,12 +159,12 @@ app.get('/generate-image', async (req, res) => {
   const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&model=flux&seed=${seed}`;
 
   try {
-    const fetchPromise = fetch(pollinationsUrl);
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Pollinations timeout after 25s')), 25000)
-    );
-
-    const response = await Promise.race([fetchPromise, timeoutPromise]);
+    let timer;
+    const timeoutPromise = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error('Pollinations timeout after 25s')), 25000);
+    });
+    const response = await Promise.race([fetch(pollinationsUrl), timeoutPromise]);
+    clearTimeout(timer); // prevent unhandled rejection crashing Node
     if (!response.ok) throw new Error(`Pollinations HTTP ${response.status}`);
 
     const buffer = await response.arrayBuffer();
@@ -199,8 +199,8 @@ app.post('/generate', async (req, res) => {
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-        max_tokens: 16000,
+        model: 'claude-sonnet-4-6',
+        max_tokens: 8000,
         messages: [{ role: 'user', content: prompt }]
       })
     });
