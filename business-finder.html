@@ -678,32 +678,39 @@ async function generateBranding(biz, biztype) {
       </div>`;
   }
 
-  setStatus('Generating AI brand images...', 'Flux AI is rendering your assets — this takes 30–60 seconds');
+  setStatus('Generating brand images with Claude AI...', 'Designing logo, backgrounds, and social media assets');
 
-  const seed = Math.floor(Math.random() * 99999);
-  const style = `professional ${biztype} business, Cornwall UK, high quality, cinematic`;
-
-  // Image definitions: token → {prompt, w, h}
-  const imgDefs = {
-    'BRAND_IMG_LOGO':     { prompt: `minimalist professional logo icon mark for ${biztype} business, clean bold symbol, no text, no letters, white background, flat design, vector art style`, w: 300, h: 300 },
-    'BRAND_IMG_LOGODARK': { prompt: `minimalist professional logo icon mark for ${biztype} business, clean bold symbol, no text, no letters, dark navy background, white icon, flat design, vector art style`, w: 300, h: 300 },
-    'BRAND_IMG_BANNER':   { prompt: `wide cinematic hero background for ${biztype} business, ${style}, moody atmospheric lighting, no text, no people, suitable for text overlay`, w: 800, h: 267 },
-    'BRAND_IMG_IGPOST':   { prompt: `square social media background for ${biztype} business, ${style}, food or product photography, warm tones, no text`, w: 500, h: 500 },
-    'BRAND_IMG_IGSTORY':  { prompt: `vertical portrait background for ${biztype} business, ${style}, dramatic lighting, atmospheric, no text`, w: 300, h: 533 },
-    'BRAND_IMG_POSTER':   { prompt: `bold promotional poster background for ${biztype} business in Cornwall, dramatic photography, rich colours, no text, suitable for text overlay`, w: 350, h: 495 },
-    'BRAND_IMG_BIZCARD':  { prompt: `premium luxury background texture for ${biztype} business card, dark rich tones, subtle pattern, no text`, w: 400, h: 240 },
-  };
-
-  // Build Pollinations URLs directly in the browser — Pollinations blocks server-side
-  // requests from Render's IP range (502) but serves browser img tags fine.
-  const tokens = Object.keys(imgDefs);
+  // Generate all 7 SVG images via Claude in one API call
   const imgMap = {};
-  for (const token of tokens) {
-    const { prompt: p, w, h } = imgDefs[token];
-    imgMap[token] = `https://image.pollinations.ai/prompt/${encodeURIComponent(p)}?width=${w}&height=${h}&nologo=true&model=flux&seed=${seed}`;
+  try {
+    const imgRes = await fetch(`${API_BASE}/generate-branding-images`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: biz.name, biztype })
+    });
+    const svgs = await imgRes.json();
+    if (svgs.error) throw new Error(svgs.error);
+
+    // Convert each SVG string to a data URI for safe embedding
+    const keyToToken = {
+      logoMark:  'BRAND_IMG_LOGO',
+      logoDark:  'BRAND_IMG_LOGODARK',
+      banner:    'BRAND_IMG_BANNER',
+      igPost:    'BRAND_IMG_IGPOST',
+      igStory:   'BRAND_IMG_IGSTORY',
+      poster:    'BRAND_IMG_POSTER',
+      bizCard:   'BRAND_IMG_BIZCARD',
+    };
+    for (const [key, token] of Object.entries(keyToToken)) {
+      if (svgs[key]) {
+        imgMap[token] = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgs[key]);
+      }
+    }
+  } catch(e) {
+    console.warn('Branding image generation failed:', e.message);
   }
 
-  setStatus('Building branding kit...', 'Assembling with Claude — images will load in the background');
+  setStatus('Building branding kit...', 'Images ready — assembling full brand guide');
 
   // Prompt uses only safe token names — no URLs, no & characters
   const prompt = `You are a senior brand designer. Build a complete single-file HTML branding kit. Use the placeholder tokens EXACTLY as written — they will be replaced with real AI images after generation.

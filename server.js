@@ -152,28 +152,74 @@ Requirements:
   }
 });
 
-// AI Image generation — proxies Pollinations.ai and returns base64 data URI
-// Falls back gracefully: always returns the direct URL so the browser can load it
-app.get('/generate-image', async (req, res) => {
-  const { prompt, w = 400, h = 400, seed = 42 } = req.query;
-  const pollinationsUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&model=flux&seed=${seed}`;
-
+// Generate all branding SVG images via Claude in one API call
+app.post('/generate-branding-images', async (req, res) => {
   try {
-    let timer;
-    const timeoutPromise = new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error('Pollinations timeout after 25s')), 25000);
-    });
-    const response = await Promise.race([fetch(pollinationsUrl), timeoutPromise]);
-    clearTimeout(timer); // prevent unhandled rejection crashing Node
-    if (!response.ok) throw new Error(`Pollinations HTTP ${response.status}`);
+    const { name, biztype } = req.body;
+    if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not set' });
 
-    const buffer = await response.arrayBuffer();
-    const base64 = Buffer.from(buffer).toString('base64');
-    const mime = response.headers.get('content-type') || 'image/jpeg';
-    res.json({ dataUri: `data:${mime};base64,${base64}`, url: pollinationsUrl });
+    const prompt = `You are a graphic designer. Generate 7 SVG assets for a "${name}" ${biztype} business branding kit.
+
+Return ONLY a valid JSON object with exactly these 7 keys. Each value must be a complete, valid SVG string.
+
+{
+  "logoMark": "SVG here",
+  "logoDark": "SVG here",
+  "banner": "SVG here",
+  "igPost": "SVG here",
+  "igStory": "SVG here",
+  "poster": "SVG here",
+  "bizCard": "SVG here"
+}
+
+SVG RULES (follow strictly):
+- NO <text> elements, NO letters, NO words anywhere in any SVG
+- NO complex <path> with many points — only simple shapes: rect, circle, ellipse, polygon, line
+- Use gradients, overlapping shapes, and layering to create visual interest
+- Each SVG must feel designed and professional, not like a blank rectangle
+
+SPECIFICATIONS:
+logoMark: viewBox="0 0 300 300". White background. A bold geometric icon representing ${biztype} — e.g. for restaurant use a stylised plate/circle/utensil shape built from simple geometry. Use 2-3 brand colours. The icon fills 60% of the canvas.
+
+logoDark: viewBox="0 0 300 300". Dark background (#1a1a2e or similar deep tone). Same icon as logoMark but in white/light colours on the dark background.
+
+banner: viewBox="0 0 800 267". Wide horizontal background for Facebook/LinkedIn cover. Rich atmospheric gradient + 3-5 abstract geometric shapes (circles, diagonal lines, subtle polygons) layered at low opacity. Feels premium and moody. Colour palette: deep tones appropriate for ${biztype}.
+
+igPost: viewBox="0 0 500 500". Square Instagram background. Bold gradient from one corner to another + 2-3 large overlapping geometric shapes at varying opacities. Warm and inviting for ${biztype}.
+
+igStory: viewBox="0 0 300 533". Portrait/vertical background. Dramatic gradient top to bottom + subtle geometric accents. Dark at top, lighter at bottom (or vice versa).
+
+poster: viewBox="0 0 350 495". Portrait promotional background. Bold, high-contrast gradient + large decorative geometric shapes. Eye-catching for ${biztype}.
+
+bizCard: viewBox="0 0 400 240". Horizontal business card background. Subtle premium texture effect using layered semi-transparent rectangles/lines at low opacity on a rich solid base colour.
+
+Pick a cohesive colour palette for ${biztype} and use it consistently across all 7 SVGs.
+Return ONLY the JSON object. No explanation, no markdown, no backticks.`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 8000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    const data = await response.json();
+    if (data.error) return res.status(500).json({ error: data.error.message });
+
+    let raw = data.content?.map(b => b.text || '').join('') || '';
+    raw = raw.replace(/```json/g, '').replace(/```/g, '').trim();
+
+    const svgs = JSON.parse(raw);
+    res.json(svgs);
   } catch(e) {
-    console.error('[generate-image] failed:', e.message, '| prompt:', prompt.substring(0, 60));
-    res.json({ error: e.message, url: pollinationsUrl });
+    res.status(500).json({ error: e.message });
   }
 });
 
