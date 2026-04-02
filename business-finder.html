@@ -664,7 +664,8 @@ REQUIREMENTS:
 }
 
 function pollinationsUrl(prompt, w, h, seed) {
-  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&model=flux&seed=${seed}&enhance=true`;
+  // Note: NO &enhance or extra params — keep URL clean
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=${w}&height=${h}&nologo=true&model=flux&seed=${seed}`;
 }
 
 async function generateBranding(biz, biztype) {
@@ -681,26 +682,28 @@ async function generateBranding(biz, biztype) {
       </div>`;
   }
 
-  setStatus('Generating AI brand images...', 'This takes 20–40 seconds — Flux AI is rendering your assets');
+  setStatus('Generating AI brand images...', 'Flux AI is rendering your assets — takes 20–40 seconds');
 
-  // One shared seed so all images feel like a consistent shoot
   const seed = Math.floor(Math.random() * 99999);
-  const style = `professional ${biztype} brand, Cornwall UK, high quality, cinematic`;
+  const style = `professional ${biztype} business, Cornwall UK, high quality, cinematic`;
 
-  // Build all image URLs (Pollinations generates on-demand — no API key needed)
-  const imgs = {
-    logoMark:  pollinationsUrl(`minimalist professional logo mark icon symbol for ${biztype} business called "${biz.name}", clean bold geometric shape, no text, no words, white background, single colour, flat design, vector art style`, 512, 512, seed),
-    logoDark:  pollinationsUrl(`minimalist professional logo mark icon symbol for ${biztype} business called "${biz.name}", clean bold geometric shape, no text, no words, dark background, white icon, flat design, vector art style`, 512, 512, seed + 1),
-    banner:    pollinationsUrl(`wide marketing hero banner background for ${biztype} business, ${style}, atmospheric moody lighting, no text, no people, suitable for text overlay, dark edges`, 1200, 400, seed),
-    igPost:    pollinationsUrl(`square instagram post background for ${biztype} business, ${style}, beautiful food/product photography, no text, warm tones, high contrast`, 1080, 1080, seed),
-    igStory:   pollinationsUrl(`vertical instagram story background for ${biztype} business, ${style}, portrait format, dramatic lighting, atmospheric, no text`, 630, 1120, seed),
-    poster:    pollinationsUrl(`A5 promotional poster background for ${biztype} business in Cornwall, bold dramatic photography, rich colours, no text, suitable for overlay`, 595, 842, seed),
-    bizCard:   pollinationsUrl(`premium business card background texture for ${biztype}, subtle luxury pattern, dark rich tone, no text`, 680, 400, seed),
+  // Map of short safe placeholder tokens → actual Pollinations URLs
+  // Claude only ever sees the tokens (no & chars to mangle).
+  // After generation we do a plain string-replace to inject the real URLs.
+  const imgMap = {
+    'BRAND_IMG_LOGO':    pollinationsUrl(`minimalist professional logo icon mark for ${biztype} business, clean bold symbol, no text, no letters, white background, flat design, vector art style`, 400, 400, seed),
+    'BRAND_IMG_LOGODARK':pollinationsUrl(`minimalist professional logo icon mark for ${biztype} business, clean bold symbol, no text, no letters, dark navy background, white icon, flat design, vector art style`, 400, 400, seed + 1),
+    'BRAND_IMG_BANNER':  pollinationsUrl(`wide cinematic hero background for ${biztype} business, ${style}, moody atmospheric lighting, no text, no people, suitable for text overlay`, 900, 300, seed),
+    'BRAND_IMG_IGPOST':  pollinationsUrl(`square social media background for ${biztype} business, ${style}, food or product photography, warm tones, no text`, 600, 600, seed),
+    'BRAND_IMG_IGSTORY': pollinationsUrl(`vertical portrait background for ${biztype} business, ${style}, dramatic lighting, atmospheric, no text`, 400, 700, seed),
+    'BRAND_IMG_POSTER':  pollinationsUrl(`bold promotional poster background for ${biztype} business in Cornwall, dramatic photography, rich colours, no text, suitable for text overlay`, 420, 595, seed),
+    'BRAND_IMG_BIZCARD': pollinationsUrl(`premium luxury background texture for ${biztype} business card, dark rich tones, subtle pattern, no text`, 500, 300, seed),
   };
 
-  setStatus('AI images queued — assembling branding kit...', 'Claude is now building your full brand guide');
+  setStatus('AI images queued — building branding kit with Claude...', 'Almost there');
 
-  const prompt = `You are a senior brand designer at a top agency. Build a stunning, pixel-perfect single-file HTML branding kit for the business below. Real AI-generated images are provided for every section — use them all.
+  // Prompt uses only safe token names — no URLs, no & characters
+  const prompt = `You are a senior brand designer. Build a complete single-file HTML branding kit. Use the placeholder tokens EXACTLY as written — they will be replaced with real AI images after generation.
 
 BUSINESS:
 - Name: ${biz.name}
@@ -708,73 +711,62 @@ BUSINESS:
 - Address: ${biz.formatted_address || ''}
 - Phone: ${biz.formatted_phone_number || ''}
 
-════════ AI-GENERATED IMAGE ASSETS (use every single one) ════════
+════════ IMAGE TOKENS (copy these exactly into src and background-image) ════════
+Logo icon, light bg:      BRAND_IMG_LOGO
+Logo icon, dark bg:       BRAND_IMG_LOGODARK
+Banner/cover background:  BRAND_IMG_BANNER
+Instagram post bg:        BRAND_IMG_IGPOST
+Instagram story bg:       BRAND_IMG_IGSTORY
+Promotional poster bg:    BRAND_IMG_POSTER
+Business card bg texture: BRAND_IMG_BIZCARD
 
-LOGO MARK (icon only, no text):
-  Light version: ${imgs.logoMark}
-  Dark version:  ${imgs.logoDark}
-
-FACEBOOK / LINKEDIN BANNER BACKGROUND: ${imgs.banner}
-
-INSTAGRAM POST BACKGROUND: ${imgs.igPost}
-
-INSTAGRAM STORY BACKGROUND: ${imgs.igStory}
-
-PROMOTIONAL POSTER BACKGROUND: ${imgs.poster}
-
-BUSINESS CARD BACKGROUND TEXTURE: ${imgs.bizCard}
-
-════════ CRITICAL RULES ════════
-1. Every image above MUST appear in the output using <img src="URL"> or as a CSS background-image. Do not omit any.
-2. NEVER use SVG paths to draw letters. All business names, taglines, and text = real HTML text nodes with font-family CSS.
-3. For the logo: always show <img src="${imgs.logoMark}"> (80×80px, object-fit:contain) beside the business name in a bold heading font — this is your logo component. Reuse it everywhere consistently.
-4. For image backgrounds (banner, poster, story): use position:relative on the container, set the image as background-image:url() with background-size:cover, then overlay text with position:absolute divs with semi-transparent dark/coloured backgrounds for legibility.
-5. All text must be readable — use white text on dark backgrounds, dark text on light.
-6. Use min-height not fixed height on all content containers. overflow:visible on everything.
-7. Load Google Fonts — one premium heading font + one body font appropriate for ${biztype}.
+════════ RULES ════════
+1. Use EVERY token above at least once. For <img> tags: <img src="BRAND_IMG_LOGO">. For CSS backgrounds: background-image:url(BRAND_IMG_BANNER). Copy tokens character-for-character — do not modify them.
+2. NEVER use SVG paths to draw letters or text. All text = real HTML text nodes.
+3. Logo component (reused in every section): <img src="BRAND_IMG_LOGO" style="width:72px;height:72px;object-fit:contain;border-radius:10px"> + business name in bold heading font beside it in a flex row.
+4. For sections with image backgrounds: position:relative wrapper, background-image:url(TOKEN) background-size:cover, then absolutely-positioned text overlays with semi-transparent rgba backgrounds for legibility.
+5. Use min-height (never fixed height) on content boxes. overflow:visible on all containers.
+6. Load Google Fonts — one heading font + one body font for ${biztype}.
+7. Define 5 brand colours as CSS :root variables: --c-primary, --c-secondary, --c-accent, --c-light, --c-dark. Use them throughout.
 8. Output ONLY raw HTML starting with <!DOCTYPE html>. No markdown, no explanation.
 
-════════ COLOUR PALETTE ════════
-Choose 5 colours for a ${biztype}. Define as CSS :root variables. Use throughout.
-Primary, Secondary, Accent, Light, Dark — pick sophisticated professional tones.
-
-════════ SECTIONS (all 7, in order) ════════
+════════ SECTIONS (all 7, in order, no skipping) ════════
 
 SECTION 1 — LOGO & BRAND IDENTITY
-Three logo lockups:
-• White background: logo mark image + wordmark text side by side, padding 48px, min-height 160px
-• Primary colour bg: same logo, ensure contrast
-• Dark bg: use dark logo mark image (${imgs.logoDark}) + white wordmark text
+Three logo lockups side by side as cards (min-height:160px, padding:40px, border-radius:8px):
+  • White background card
+  • var(--c-primary) background card
+  • Dark background card — use BRAND_IMG_LOGODARK token instead of BRAND_IMG_LOGO
 
 SECTION 2 — COLOUR PALETTE
-5 swatches, flex row, each 160×120px with hex and name below. Real HTML text only.
+5 swatches in a flex row. Each: 160×120px, border-radius:8px. Colour name + hex below each. Real HTML text.
 
 SECTION 3 — TYPOGRAPHY
-Font names, type scale: H1 (48px) H2 (36px) H3 (24px) Body (16px) Caption (12px) using real text.
+Heading font name + body font name. Type scale: H1 48px, H2 36px, H3 24px, Body 16px, Caption 12px. Use business name as example text.
 
 SECTION 4 — BUSINESS CARD
-Two cards side by side, 340×200px each, border-radius:12px, box-shadow.
-FRONT: background-image:url(${imgs.bizCard}), background-size:cover. Overlay: logo top-left, business name + tagline centre, phone + address bottom. All text white with text-shadow.
-BACK: background-image:url(${imgs.bizCard}), darker overlay. Logo mark image centred (120×120px). Website placeholder bottom-centre.
+Two cards side by side, 340×200px, border-radius:12px, box-shadow.
+  FRONT: background-image:url(BRAND_IMG_BIZCARD), background-size:cover. Dark overlay (rgba 0,0,0,0.5). Logo top-left. Business name + tagline centred. Phone + address bottom-left. White text throughout.
+  BACK: background-image:url(BRAND_IMG_BIZCARD), background-size:cover. Darker overlay. Logo icon centred (100×100px). Website placeholder bottom-centre. White text.
 
-SECTION 5 — SOCIAL MEDIA (ALL FOUR MANDATORY, label each clearly)
-a) Profile Picture — 200×200px circle. background-image:url(${imgs.logoMark}), background-size:cover, border-radius:50%.
-b) Facebook/LinkedIn Cover — 820×312px div. background-image:url(${imgs.banner}), background-size:cover. Centre overlay: logo + business name large + tagline. Use rgba dark overlay for legibility.
-c) Instagram Post — 400×400px div. background-image:url(${imgs.igPost}), background-size:cover. Bottom overlay: logo + business name + phone + address on semi-transparent bar.
-d) Instagram Story — 220×390px div. background-image:url(${imgs.igStory}), background-size:cover. Top: logo. Middle: big bold tagline. Bottom: contact details. Semi-transparent overlays.
+SECTION 5 — SOCIAL MEDIA (ALL FOUR, label each)
+  a) Profile Picture — 200×200px, border-radius:50%. Use: <img src="BRAND_IMG_LOGO" style="width:200px;height:200px;border-radius:50%;object-fit:cover">
+  b) Facebook/LinkedIn Cover — 820×312px. background-image:url(BRAND_IMG_BANNER), background-size:cover. Dark overlay. Logo + business name large + tagline centred.
+  c) Instagram Post — 400×400px. background-image:url(BRAND_IMG_IGPOST), background-size:cover. Bottom bar (rgba dark): logo + name + phone.
+  d) Instagram Story — 220×390px. background-image:url(BRAND_IMG_IGSTORY), background-size:cover. Top overlay: logo. Middle: big tagline. Bottom bar: contact.
 
 SECTION 6 — PROMOTIONAL POSTER
-420×595px div. background-image:url(${imgs.poster}), background-size:cover. Overlay with 3 layers:
-• Top 25%: dark semi-transparent bar — logo centred
-• Middle: business name very large, tagline, 3 bullet services
-• Bottom 20%: dark bar — phone, address, website placeholder
+420×595px, position:relative. background-image:url(BRAND_IMG_POSTER), background-size:cover.
+  • Top strip (dark overlay): logo centred
+  • Middle: business name very large, tagline, 3 bullet point services
+  • Bottom strip (dark overlay): phone, address, website placeholder
 
 SECTION 7 — EMAIL SIGNATURE
-Inside a dashed border preview div. Inline CSS only (email-safe).
-Left: logo mark image 60×60px. Right: business name bold, tagline italic, phone, address, email placeholder. All real text.
+Wrapped in <div style="border:2px dashed #ccc;padding:20px;background:#fff;display:inline-block">.
+Inline CSS only. Logo image 56×56px left, text right: business name bold, tagline italic, phone, address, email placeholder.
 
-════════ PAGE WRAPPER ════════
-Light grey (#f5f5f5) page background. Each section: full-width dark header label bar (monospace white text), then content with 40px padding. Max-width 1040px centred. 60px gap between sections.
+════════ PAGE ════════
+background:#f5f5f5. Each section: full-width dark label bar (monospace white text 13px), then 40px-padded content. Max-width:1040px centred. margin-bottom:64px between sections.
 
 Output ONLY raw HTML starting with <!DOCTYPE html>.`;
 
@@ -792,6 +784,11 @@ Output ONLY raw HTML starting with <!DOCTYPE html>.`;
     let html = data.content.map(b => b.text || '').join('');
     html = html.replace(/```html/g, '').replace(/```/g, '').trim();
     if (!html) throw new Error('Empty branding package generated.');
+
+    // Inject real image URLs in place of tokens — done here in JS, never through Claude
+    for (const [token, url] of Object.entries(imgMap)) {
+      html = html.split(token).join(url);
+    }
 
     currentHTML = html;
     showBrandingPreview(biz.name);
