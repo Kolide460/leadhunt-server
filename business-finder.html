@@ -627,53 +627,91 @@ async function generateBranding(biz, biztype) {
     </div>`;
   document.getElementById('modalFooter').style.display = 'none';
 
-  const prompt = `You are a professional brand designer. Create a complete, single-file HTML branding kit for the following business. Everything must be embedded in one HTML file using only SVG and CSS — no external images or fonts except Google Fonts loaded from CDN.
+  const prompt = `You are a professional brand designer. Generate a complete single-file HTML branding kit. Follow every instruction below exactly.
 
 BUSINESS:
 - Name: ${biz.name}
 - Type: ${biztype}
 - Address: ${biz.formatted_address || ''}
 - Phone: ${biz.formatted_phone_number || ''}
-- Rating: ${biz.rating || 'N/A'} stars
 
-OUTPUT a single HTML page that acts as a visual branding kit with the following sections, clearly labelled:
+════════════════════════════════════════
+CRITICAL RULES — NEVER BREAK THESE:
+════════════════════════════════════════
+1. NEVER use <path> or <polyline> to draw letters or text. ALL text must be real HTML text nodes or SVG <text> elements with a font-family. If you use paths for letters the output will be unreadable garbage.
+2. NEVER clip text. Every container must have enough height for its content. Use min-height, not fixed height, on any box that contains text. Set overflow:visible on all SVGs.
+3. You MUST include ALL 7 sections listed below. Do not skip any. The banner (section 5) is mandatory.
+4. Load Google Fonts at the top: pick one heading font and one body font suited to a ${biztype}.
+5. Output ONLY raw HTML starting with <!DOCTYPE html>. No markdown fences, no explanation.
 
-1. BRAND IDENTITY
-   - Primary logo (SVG, horizontal layout with icon + wordmark)
-   - Icon/favicon version (SVG, square, icon only)
-   - Logo on dark background variant
-   - Logo on light background variant
+════════════════════════════════════════
+COLOUR PALETTE — decide this first, use it everywhere:
+════════════════════════════════════════
+Choose 5 colours appropriate for a ${biztype}: Primary, Secondary, Accent, Light background, Dark background.
+Define them as CSS variables on :root and reference them throughout.
 
-2. COLOUR PALETTE
-   - 5 brand colours with hex codes, names, and usage notes (Primary, Secondary, Accent, Light, Dark)
-   - Show large swatches
+════════════════════════════════════════
+LOGO RULES — read carefully:
+════════════════════════════════════════
+The logo has two parts:
+  A) ICON — a simple SVG shape (circle, rectangle, rounded rect, or 2–3 basic geometric shapes max). NO complex paths. The icon represents the business type visually.
+  B) WORDMARK — the business name "${biz.name}" rendered as a real HTML/CSS <span> or SVG <text> element using the chosen heading font. Large, bold, styled.
+Always render the logo as: [icon SVG] + [wordmark text] side by side in a flex row.
 
-3. TYPOGRAPHY
-   - Heading font + body font recommendation (from Google Fonts)
-   - Show type scale: H1, H2, H3, body, caption with example text
+════════════════════════════════════════
+SECTIONS — generate all 7 in order:
+════════════════════════════════════════
 
-4. BUSINESS CARD
-   - Front and back, realistic card dimensions (85×54mm ratio), fully designed with logo, name, phone, address, website placeholder
+SECTION 1 — BRAND IDENTITY
+Show the logo 3 times:
+  • On white background (full width card, padding 40px)
+  • On the Primary colour background (full width card, padding 40px)
+  • On the Dark background colour (full width card, padding 40px)
+Each card: min-height 140px, border-radius 8px.
 
-5. SOCIAL MEDIA TEMPLATES (show as visual mockups)
-   - Profile picture (1:1, 400×400)
-   - Facebook/LinkedIn cover banner (16:3 ratio)
-   - Instagram post (1:1, 1080×1080 scaled down)
-   - Instagram story (9:16 ratio, scaled down)
+SECTION 2 — COLOUR PALETTE
+5 swatches in a flex row. Each swatch: 160px wide, 120px tall, border-radius 8px, background = that colour.
+Below each swatch show: colour name, hex code, usage note. All text in HTML, never in SVG paths.
 
-6. POSTER / FLYER
-   - A5 portrait promotional poster with logo, tagline, contact info
+SECTION 3 — TYPOGRAPHY
+Show the heading font name and body font name.
+Render a type scale using real HTML text: H1 (48px), H2 (36px), H3 (24px), Body (16px), Caption (12px).
+Example text for each: use the business name or a relevant phrase.
 
-7. EMAIL SIGNATURE
-   - HTML email signature snippet with logo, name, title, phone, website
+SECTION 4 — BUSINESS CARD
+Two cards side by side (front and back). Each card: exactly 340px × 200px, border-radius 8px, box-shadow.
+Front: logo top-left, business name large, tagline small, phone and address bottom-left.
+Back: solid Primary colour background, large centred icon only (no wordmark), website placeholder bottom-centre.
+All text is real HTML text. No SVG paths for letters.
 
-DESIGN REQUIREMENTS:
-- Derive a professional colour palette and style appropriate for a ${biztype} business
-- All assets must use the same consistent brand identity (same colours, fonts, logo)
-- Use SVG for all graphics — no placeholder boxes, fully designed
-- Each section should have a dark section header label
-- The page itself should have a clean white/light grey background for easy screenshotting
-- Output ONLY raw HTML, no markdown, no explanation`;
+SECTION 5 — SOCIAL MEDIA BANNERS (ALL FOUR ARE MANDATORY)
+Render all four as HTML/CSS div mockups with real text inside:
+  a) Profile picture — 200×200px div, border-radius 50%, centred icon + initials
+  b) Facebook/LinkedIn cover — 820×312px div (scale with max-width:100%), background gradient or Primary colour, logo centred, tagline below
+  c) Instagram post — 400×400px div, attractive layout with logo + tagline + contact
+  d) Instagram story — 200×356px div, portrait layout, logo top, big tagline middle, contact bottom
+Label each one clearly above it.
+
+SECTION 6 — POSTER / FLYER
+A div styled as A5 portrait (420px × 595px), border, box-shadow.
+Include: logo top-centre, business name large, tagline, 3 bullet services, phone, address, a CTA button styled element.
+All real HTML text.
+
+SECTION 7 — EMAIL SIGNATURE
+A ready-to-use HTML email signature inside a <div style="border:2px dashed #ccc;padding:20px;background:#fff">.
+Include: icon + business name side by side, job title, phone, address, email placeholder.
+Style it with inline CSS only (email client compatible). All real text.
+
+════════════════════════════════════════
+PAGE LAYOUT:
+════════════════════════════════════════
+- White/light grey page background
+- Each section in its own <section> with: a full-width dark header bar showing the section title in white monospace text, then the content below with 40px padding
+- Max-width 1000px centred on page
+- Clean spacing between sections (margin-bottom: 60px)
+- No section may be cut off — use min-height and overflow:visible everywhere
+
+Output ONLY raw HTML starting with <!DOCTYPE html>. No markdown, no explanation, no commentary.`;
 
   try {
     const response = await fetch(`${API_BASE}/generate`, {
