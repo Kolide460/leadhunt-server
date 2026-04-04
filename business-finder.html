@@ -834,6 +834,12 @@ REQUIREMENTS:
 
     if (!html) throw new Error('Empty HTML generated. Response: ' + JSON.stringify(data));
 
+    // Detect truncated output (hit token limit mid-generation)
+    const stopReason = data.stop_reason;
+    if (stopReason === 'max_tokens') {
+      throw new Error('Generation was cut off — the website was too long to generate in one pass. Try deselecting some sections in the control screen, then try again.');
+    }
+
     currentHTML = html;
     showPreview(html, biz.name);
 
