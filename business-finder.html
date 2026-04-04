@@ -1046,23 +1046,34 @@ function showBrandingPreview(name) {
 
 function showPreview(html, name) {
   const slug = name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
+  const sizeKb = Math.round(new Blob([html]).size / 1024);
   document.getElementById('modalBody').innerHTML = `
-    <div style="padding:16px 0 8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
-      <div>
-        <span style="font-size:13px;color:var(--accent);font-family:'DM Mono',monospace;letter-spacing:0.06em;">✦ WEBSITE READY</span>
-        <p style="font-size:13px;color:var(--muted);margin-top:2px;">Suggested domain: <span style="color:var(--accent);font-family:'DM Mono',monospace;">www.${slug}.co.uk</span></p>
+    <div style="text-align:center;padding:48px 20px 32px;">
+      <div style="font-size:48px;margin-bottom:16px;">✅</div>
+      <h3 style="font-family:'Syne',sans-serif;font-size:22px;font-weight:700;margin-bottom:10px;color:var(--accent);">Website Ready</h3>
+      <p style="color:var(--muted);font-size:14px;margin-bottom:4px;">Generated for <strong style="color:var(--text);">${escHtml(name)}</strong></p>
+      <p style="color:var(--muted);font-size:12px;font-family:'DM Mono',monospace;margin-bottom:28px;">${sizeKb} KB · single HTML file</p>
+      <button onclick="previewInNewTab()" style="
+        background:var(--accent);color:#000;border:none;
+        padding:13px 32px;border-radius:6px;
+        font-family:'Syne',sans-serif;font-size:14px;font-weight:700;
+        cursor:pointer;margin-bottom:24px;letter-spacing:0.02em;">
+        👁 Preview Website
+      </button>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:14px 16px;text-align:left;">
+        <p style="font-size:11px;color:var(--muted);margin-bottom:4px;font-family:'DM Mono',monospace;letter-spacing:0.05em;">SUGGESTED DOMAIN</p>
+        <p style="font-size:14px;color:var(--accent);font-family:'DM Mono',monospace;">www.${slug}.co.uk</p>
       </div>
-    </div>
-    <div class="website-preview">
-      <div class="preview-bar">
-        <div class="preview-dots"><span class="d1"></span><span class="d2"></span><span class="d3"></span></div>
-        <div class="preview-url">www.${slug}.co.uk</div>
-      </div>
-      <iframe id="resultPreviewFrame" style="width:100%;height:520px;border:none;background:#fff;" sandbox="allow-scripts allow-same-origin"></iframe>
     </div>`;
   document.getElementById('modalFooter').style.display = 'flex';
-  // Use srcdoc to render the generated HTML inline (works even on Netlify)
-  document.getElementById('resultPreviewFrame').srcdoc = html;
+}
+
+function previewInNewTab() {
+  if (!currentHTML) return;
+  const blob = new Blob([currentHTML], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  window.open(url, '_blank');
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
 function openModal(name) {
