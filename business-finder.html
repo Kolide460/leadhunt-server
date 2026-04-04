@@ -840,6 +840,13 @@ REQUIREMENTS:
       throw new Error('Generation was cut off — the website was too long to generate in one pass. Try deselecting some sections in the control screen, then try again.');
     }
 
+    // Replace custom photo tokens with base64 data URIs
+    if (options?.customPhotos?.length) {
+      for (const { token, dataUri } of options.customPhotos) {
+        html = html.split(token).join(dataUri);
+      }
+    }
+
     currentHTML = html;
     showPreview(html, biz.name);
 
@@ -1334,14 +1341,25 @@ function populateControlScreen() {
       <div class="ctrl-section-label">2 — Photo Picker <span style="color:var(--danger);">*</span></div>
       <div id="photoGrid" class="photo-grid">
         ${photoUrls.length === 0
-          ? '<p style="font-size:13px;color:var(--muted);font-family:\'DM Mono\',monospace;">No Google Business photos found for this listing.</p>'
+          ? '<p style="font-size:13px;color:var(--muted);font-family:\'DM Mono\',monospace;">No Google Business photos found — upload your own below.</p>'
           : photoUrls.map((url, i) => `
             <div class="photo-thumb${i === 0 ? ' selected' : ''}" data-url="${escHtml(url)}" onclick="togglePhoto(this)">
               <img src="${escHtml(url)}" loading="lazy" alt=""/>
               <div class="photo-check">✓</div>
             </div>`).join('')}
       </div>
-      ${scraped.instagram ? `<p style="font-size:12px;color:var(--muted);margin-top:4px;">Instagram: <a href="${escHtml(scraped.instagram)}" target="_blank" style="color:var(--accent);">${escHtml(scraped.instagram)}</a></p>` : ''}
+      <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <label for="photoUploadInput" style="
+          display:inline-flex;align-items:center;gap:6px;
+          background:var(--surface2);border:1px solid var(--border);color:var(--text);
+          padding:8px 16px;border-radius:5px;font-size:12px;cursor:pointer;
+          font-family:'DM Sans',sans-serif;transition:border-color 0.2s;">
+          + Upload Photos
+        </label>
+        <input type="file" id="photoUploadInput" accept="image/*" multiple style="display:none" onchange="handlePhotoUpload(this)"/>
+        <span style="font-size:12px;color:var(--muted);">Upload from your computer — these are embedded directly in the generated website</span>
+      </div>
+      ${scraped.instagram ? `<p style="font-size:12px;color:var(--muted);margin-top:8px;">Instagram found: <a href="${escHtml(scraped.instagram)}" target="_blank" style="color:var(--accent);">${escHtml(scraped.instagram)}</a> — save photos from there and upload above</p>` : ''}
     </div>
 
     <div class="ctrl-section">
@@ -1426,6 +1444,47 @@ function renderLogoSection() {
 function togglePhoto(el) {
   el.classList.toggle('selected');
   updateBuildButton();
+}
+
+async function handlePhotoUpload(input) {
+  const files = [...input.files];
+  if (!files.length) return;
+  const grid = document.getElementById('photoGrid');
+
+  // Remove "no photos" placeholder text if present
+  const placeholder = grid.querySelector('p');
+  if (placeholder) placeholder.remove();
+
+  for (const file of files) {
+    const dataUri = await compressImage(file);
+    const thumb = document.createElement('div');
+    thumb.className = 'photo-thumb selected';
+    thumb.dataset.custom = '1';
+    thumb.dataset.uri = dataUri;
+    thumb.onclick = function() { togglePhoto(this); };
+    thumb.innerHTML = `<img src="${dataUri}" alt=""/><div class="photo-check">✓</div>`;
+    grid.appendChild(thumb);
+  }
+  input.value = ''; // reset so same files can be re-added
+  updateBuildButton();
+}
+
+function compressImage(file) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const objUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 1200;
+      let w = img.width, h = img.height;
+      if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(objUrl);
+      resolve(canvas.toDataURL('image/jpeg', 0.78));
+    };
+    img.src = objUrl;
+  });
 }
 
 function updateBuildButton() {
@@ -1520,7 +1579,14 @@ function buildWebsite() {
     email: document.getElementById('ci-email').value,
   };
 
-  const selectedPhotos = [...document.querySelectorAll('.photo-thumb.selected')].map(el => el.dataset.url);
+  const selectedEls = [...document.querySelectorAll('.photo-thumb.selected')];
+  const customPhotos = selectedEls
+    .filter(el => el.dataset.custom)
+    .map((el, i) => ({ token: `CUSTOM_PHOTO_${i}`, dataUri: el.dataset.uri }));
+  const selectedPhotos = selectedEls.map((el, i) =>
+    el.dataset.custom ? `CUSTOM_PHOTO_${customPhotos.findIndex(c => c.dataUri === el.dataset.uri)}` : el.dataset.url
+  );
+
   const sections = [...document.querySelectorAll('.section-toggle input:checked')].map(el => el.dataset.section);
   const scheme = COLOR_SCHEMES.find(cs => cs.id === selectedColorScheme) || COLOR_SCHEMES[0];
   const allReviews = richData.reviews || [];
@@ -1528,7 +1594,7 @@ function buildWebsite() {
     .map(el => allReviews[parseInt(el.dataset.idx)]).filter(Boolean);
   const logo = { choice: controlData.logoChoice, value: controlData.logoValue };
 
-  const options = { info, selectedPhotos, sections, scheme, selectedReviews, logo, scraped };
+  const options = { info, selectedPhotos, customPhotos, sections, scheme, selectedReviews, logo, scraped };
 
   closeControlScreen();
   generateWebsite(richData, biztype, options);
