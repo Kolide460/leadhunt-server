@@ -239,16 +239,12 @@ app.post('/generate', async (req, res) => {
       return;
     }
 
-    const reader = anthropicRes.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
 
     try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
+      for await (const chunk of anthropicRes.body) {
+        buffer += decoder.decode(chunk, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop();
 
