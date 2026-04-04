@@ -153,7 +153,7 @@ select option{background:var(--surface2);}
 }
 .modal{
   background:var(--surface);border:1px solid var(--border);border-radius:10px;
-  width:100%;max-width:900px;max-height:90vh;
+  width:100%;max-width:960px;max-height:92vh;
   display:flex;flex-direction:column;overflow:hidden;
 }
 .modal-header{
@@ -227,6 +227,145 @@ iframe{width:100%;height:480px;border:none;background:#fff;}
   #editorMain{grid-template-columns:1fr;grid-template-rows:1fr 1fr;}
   #editorPane{border-right:none;border-bottom:1px solid var(--border);}
 }
+
+/* ── CONTROL SCREEN ──────────────────────────────────────────────────── */
+#controlOverlay{
+  position:fixed;inset:0;background:var(--bg);z-index:150;
+  display:none;flex-direction:column;
+}
+#controlHeader{
+  padding:16px 28px;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;gap:16px;
+}
+.ctrl-header-left{display:flex;flex-direction:column;gap:2px;}
+.ctrl-header-title{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;}
+.ctrl-header-title span{color:var(--accent);}
+.ctrl-header-sub{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;}
+.ctrl-close-btn{
+  background:none;border:1px solid var(--border);color:var(--muted);
+  padding:7px 16px;border-radius:5px;cursor:pointer;font-size:13px;
+  transition:color 0.2s,border-color 0.2s;white-space:nowrap;
+}
+.ctrl-close-btn:hover{color:var(--danger);border-color:var(--danger);}
+#controlProgress{
+  padding:10px 28px;background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:14px;flex-shrink:0;
+}
+.progress-track{flex:1;height:4px;background:var(--border);border-radius:2px;overflow:hidden;}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.4s ease;width:0%;}
+#controlProgressText{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;min-width:180px;text-align:right;}
+#controlBody{
+  flex:1;overflow-y:auto;padding:0 40px;
+  display:flex;flex-direction:column;
+}
+.ctrl-section{
+  padding:28px 0;border-bottom:1px solid var(--border);
+  display:flex;flex-direction:column;gap:16px;
+  max-width:880px;width:100%;
+}
+.ctrl-section:last-child{border-bottom:none;}
+.ctrl-section-label{
+  font-family:'Syne',sans-serif;font-size:11px;font-weight:700;
+  color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;
+}
+.ctrl-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.ctrl-fields .ctrl-field{display:flex;flex-direction:column;gap:6px;}
+.ctrl-fields .ctrl-field.full{grid-column:1/-1;}
+.ctrl-fields label{font-size:12px;color:var(--muted);}
+.ctrl-input{
+  background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+  padding:10px 13px;font-size:14px;color:var(--text);outline:none;
+  font-family:'DM Sans',sans-serif;transition:border-color 0.2s;width:100%;
+}
+.ctrl-input:focus{border-color:var(--accent);}
+.photo-grid{display:flex;flex-wrap:wrap;gap:10px;}
+.photo-thumb{
+  width:120px;height:90px;border-radius:6px;overflow:hidden;
+  border:2px solid var(--border);cursor:pointer;position:relative;
+  transition:border-color 0.15s;flex-shrink:0;
+}
+.photo-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+.photo-thumb .photo-check{
+  position:absolute;top:5px;right:5px;
+  width:22px;height:22px;border-radius:50%;
+  background:rgba(0,0,0,0.55);border:2px solid rgba(255,255,255,0.35);
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;color:transparent;transition:all 0.15s;
+  pointer-events:none;
+}
+.photo-thumb.selected{border-color:var(--accent);}
+.photo-thumb.selected .photo-check{background:var(--accent);border-color:var(--accent);color:#000;}
+.sections-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+.section-toggle{
+  display:flex;align-items:center;gap:9px;padding:11px 14px;
+  background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+  cursor:pointer;transition:border-color 0.15s;user-select:none;
+}
+.section-toggle:hover{border-color:var(--accent);}
+.section-toggle input{accent-color:var(--accent);width:14px;height:14px;cursor:pointer;}
+.section-toggle span{font-size:13px;color:var(--text);}
+.colour-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+.colour-card{
+  padding:14px 10px 12px;border-radius:8px;border:2px solid var(--border);
+  cursor:pointer;transition:border-color 0.15s;text-align:center;
+}
+.colour-card:hover{border-color:var(--muted);}
+.colour-card.selected{border-color:var(--accent);}
+.colour-swatches{display:flex;gap:4px;justify-content:center;margin-bottom:8px;}
+.colour-swatch{width:18px;height:18px;border-radius:50%;border:1px solid rgba(255,255,255,0.08);}
+.colour-card-name{font-size:11px;color:var(--muted);font-family:'DM Mono',monospace;}
+.review-pick{
+  display:flex;align-items:flex-start;gap:12px;padding:14px;
+  background:var(--surface2);border:1px solid var(--border);border-radius:6px;
+  cursor:pointer;transition:border-color 0.15s;
+}
+.review-pick:hover{border-color:var(--muted);}
+.review-pick.selected{border-color:var(--accent);background:rgba(0,229,160,0.04);}
+.review-pick input{accent-color:var(--accent);flex-shrink:0;margin-top:3px;width:14px;height:14px;cursor:pointer;}
+.review-pick-body{flex:1;}
+.review-pick-header{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.review-pick-author{font-size:13px;font-weight:600;color:var(--text);}
+.review-pick-stars{font-size:12px;color:var(--warning);}
+.review-pick-text{font-size:13px;color:var(--muted);line-height:1.5;}
+.logo-preview-box{
+  display:flex;align-items:flex-start;gap:16px;padding:16px;
+  background:var(--surface2);border:1px solid var(--border);border-radius:8px;
+}
+.logo-img-frame{
+  width:96px;height:96px;border-radius:8px;background:#fff;
+  border:1px solid var(--border);display:flex;align-items:center;
+  justify-content:center;overflow:hidden;flex-shrink:0;
+}
+.logo-img-frame img{max-width:100%;max-height:100%;object-fit:contain;}
+.logo-actions{display:flex;flex-direction:column;gap:8px;justify-content:center;padding-top:4px;}
+.logo-actions p{font-size:13px;color:var(--text);}
+.logo-btn{
+  background:var(--surface);border:1px solid var(--border);color:var(--text);
+  padding:8px 16px;border-radius:5px;font-size:12px;cursor:pointer;
+  font-family:'DM Sans',sans-serif;transition:border-color 0.2s,color 0.2s;white-space:nowrap;
+}
+.logo-btn:hover{border-color:var(--accent);color:var(--accent);}
+.logo-btn.active{background:rgba(0,229,160,0.1);border-color:var(--accent);color:var(--accent);}
+.logo-btn:disabled{opacity:0.45;cursor:not-allowed;}
+.logo-none-box{
+  padding:16px;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;display:flex;align-items:center;gap:16px;
+}
+.logo-none-box p{font-size:13px;color:var(--muted);}
+#controlFooter{
+  padding:16px 40px;border-top:1px solid var(--border);
+  background:var(--surface);display:flex;align-items:center;
+  justify-content:space-between;flex-shrink:0;
+}
+#buildBtn{
+  background:var(--accent);color:#000;border:none;
+  padding:13px 36px;border-radius:6px;
+  font-family:'Syne',sans-serif;font-size:15px;font-weight:700;
+  cursor:pointer;transition:opacity 0.2s,transform 0.15s;letter-spacing:0.02em;
+}
+#buildBtn:hover{opacity:0.88;transform:translateY(-1px);}
+#buildBtn:disabled{opacity:0.35;cursor:not-allowed;transform:none;}
+#buildBtnHint{font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;}
 </style>
 </head>
 <body>
@@ -330,6 +469,26 @@ iframe{width:100%;height:480px;border:none;background:#fff;}
       <button class="copy-btn" onclick="copyHTML()">Copy HTML</button>
       <button class="dl-btn" onclick="downloadHTML()">⬇ Download Website</button>
     </div>
+  </div>
+</div>
+
+<!-- CONTROL SCREEN OVERLAY -->
+<div id="controlOverlay">
+  <div id="controlHeader">
+    <div class="ctrl-header-left">
+      <div class="ctrl-header-title">Configure Website — <span id="controlBizName"></span></div>
+      <div class="ctrl-header-sub">Customise before generating</div>
+    </div>
+    <button class="ctrl-close-btn" onclick="closeControlScreen()">✕ Cancel</button>
+  </div>
+  <div id="controlProgress">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <span id="controlProgressText">Loading business data...</span>
+  </div>
+  <div id="controlBody"></div>
+  <div id="controlFooter">
+    <span id="buildBtnHint">Select at least 1 photo to continue</span>
+    <button id="buildBtn" disabled onclick="buildWebsite()">Build Website →</button>
   </div>
 </div>
 
@@ -499,7 +658,7 @@ function renderResults(places, noWebsiteMode, biztype, location) {
         </div>
       </div>
       <div class="biz-actions">
-        <button class="gen-btn" onclick="generateWebsite(${JSON.stringify(p).replace(/"/g, '&quot;')}, '${escHtml(biztype)}')">Generate Website →</button>
+        <button class="gen-btn" onclick="openControlScreen(${JSON.stringify(p).replace(/"/g, '&quot;')}, '${escHtml(biztype)}')">Generate Website →</button>
         <button class="brand-btn" onclick="generateBranding(${JSON.stringify(p).replace(/"/g, '&quot;')}, '${escHtml(biztype)}')">✦ Branding Package</button>
         <a href="https://www.google.com/search?q=${encodeURIComponent(p.name + ' ' + (p.formatted_address || ''))}" target="_blank" style="font-size:11px;color:var(--muted);text-decoration:none;display:inline-flex;align-items:center;gap:4px;">🔍 Google ↗</a>
         ${p.website ? `<a href="${p.website}" target="_blank" style="font-size:11px;color:var(--muted);text-decoration:none;">View existing ↗</a>` : ''}
@@ -515,115 +674,145 @@ function renderResults(places, noWebsiteMode, biztype, location) {
     <div class="results-list">${rows}</div>`;
 }
 
-async function generateWebsite(biz, biztype) {
+async function generateWebsite(biz, biztype, options = null) {
   currentBiz = biz;
   openModal(biz.name);
 
   document.getElementById('modalBody').innerHTML = `
     <div class="modal-loading">
       <div class="spinner"></div>
-      <p>Gathering business data...</p>
-      <p style="font-size:12px;margin-top:4px;opacity:0.5;">Fetching opening hours, reviews, social media...</p>
+      <p>${options ? `Building website for ${escHtml(biz.name)}...` : 'Gathering business data...'}</p>
+      ${options ? '' : '<p style="font-size:12px;margin-top:4px;opacity:0.5;">Fetching opening hours, reviews, social media...</p>'}
     </div>`;
   document.getElementById('modalFooter').style.display = 'none';
 
-  // Fetch rich details including hours, reviews, photos (skip for test fixtures)
   let richData = biz;
-  if (biz.place_id && !biz.place_id.startsWith('TEST_')) {
-    try {
-      const detailRes = await fetch(`${API_BASE}/details?place_id=${biz.place_id || ''}`);
-      const detailJson = await detailRes.json();
-      if (detailJson.result) richData = { ...biz, ...detailJson.result };
-    } catch(e) {}
-  }
+  let photoUrls = [];
+  let scraped = {};
+  let logoImageUrl = '';
 
-  // Get Google photo URLs
-  document.querySelector('.modal-loading p').textContent = 'Fetching business photos...';
-  const photoUrls = [];
-  if (richData.photos && richData.photos.length > 0) {
-    const photoRefs = richData.photos.slice(0, 3);
-    for (const p of photoRefs) {
+  if (options) {
+    // Data already fetched and selections made via control screen
+    photoUrls = options.selectedPhotos || [];
+    scraped = options.scraped || {};
+    if (options.logo && options.logo.choice !== 'none' && options.logo.value) {
+      logoImageUrl = options.logo.value;
+    }
+  } else {
+    // Legacy path: fetch everything now (used by test fixture / direct calls)
+    if (biz.place_id && !biz.place_id.startsWith('TEST_')) {
       try {
-        const pr = await fetch(`${API_BASE}/photo?ref=${p.photo_reference}&maxwidth=1200`);
-        const pj = await pr.json();
-        if (pj.photo_url) photoUrls.push(pj.photo_url);
+        const detailRes = await fetch(`${API_BASE}/details?place_id=${biz.place_id || ''}`);
+        const detailJson = await detailRes.json();
+        if (detailJson.result) richData = { ...biz, ...detailJson.result };
       } catch(e) {}
     }
+
+    document.querySelector('.modal-loading p').textContent = 'Fetching business photos...';
+    if (richData.photos && richData.photos.length > 0) {
+      for (const p of richData.photos.slice(0, 3)) {
+        try {
+          const pr = await fetch(`${API_BASE}/photo?ref=${p.photo_reference}&maxwidth=1200`);
+          const pj = await pr.json();
+          if (pj.photo_url) photoUrls.push(pj.photo_url);
+        } catch(e) {}
+      }
+    }
+
+    if (richData.website) {
+      document.querySelector('.modal-loading p').textContent = 'Scanning existing web presence...';
+      try {
+        const scrapeRes = await fetch(`${API_BASE}/scrape?url=${encodeURIComponent(richData.website)}`);
+        scraped = await scrapeRes.json();
+      } catch(e) {}
+    }
+
+    document.querySelector('.modal-loading p').textContent = 'Designing logo...';
+    if (!scraped.logo) {
+      try {
+        const logoRes = await fetch(`${API_BASE}/generate-logo`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: richData.name, biztype })
+        });
+        const logoJson = await logoRes.json();
+        logoImageUrl = logoJson.imageUrl || '';
+      } catch(e) {}
+    } else {
+      logoImageUrl = scraped.logo;
+    }
+
+    document.querySelector('.modal-loading p').textContent = `Building website for ${biz.name}...`;
   }
 
-  // Try to scrape existing website for social media, email, logo
-  let scraped = {};
-  if (richData.website) {
-    document.querySelector('.modal-loading p').textContent = 'Scanning existing web presence...';
-    try {
-      const scrapeRes = await fetch(`${API_BASE}/scrape?url=${encodeURIComponent(richData.website)}`);
-      scraped = await scrapeRes.json();
-    } catch(e) {}
-  }
+  // Resolve info fields — use control screen values if provided, else fall back to API data
+  const info = options?.info || {
+    name: richData.name,
+    tagline: '',
+    phone: richData.formatted_phone_number || richData.international_phone_number || 'Contact us',
+    address: richData.formatted_address || 'Local business',
+    email: scraped.email || '',
+  };
 
-  // Generate SVG logo if none found
-  document.querySelector('.modal-loading p').textContent = 'Designing logo...';
-  let logoSvg = '';
-  if (!scraped.logo) {
-    try {
-      const logoRes = await fetch(`${API_BASE}/generate-logo`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: richData.name, biztype })
-      });
-      const logoJson = await logoRes.json();
-      logoSvg = logoJson.svg || '';
-    } catch(e) {}
-  }
+  const sections = options?.sections || ['Hero', 'About', 'Services', 'Opening Hours', 'Reviews', 'Gallery', 'Contact'];
+  const scheme = options?.scheme || null;
+  const selectedReviews = options?.selectedReviews || (richData.reviews || []).slice(0, 3);
 
-  document.querySelector('.modal-loading p').textContent = `Building website for ${biz.name}...`;
-
-  // Build opening hours string
   const hoursText = richData.opening_hours?.weekday_text?.join('\n') || 'Contact us for opening hours';
 
-  // Build reviews summary
-  const reviews = (richData.reviews || []).slice(0, 3).map(r =>
+  const reviewsText = selectedReviews.map(r =>
     `"${r.text?.substring(0,150)}" — ${r.author_name} (${r.rating}★)`
   ).join('\n');
 
-  // Build social media info
   const socials = [];
   if (scraped.instagram) socials.push(`Instagram: ${scraped.instagram}`);
   if (scraped.facebook) socials.push(`Facebook: ${scraped.facebook}`);
   if (scraped.tiktok) socials.push(`TikTok: ${scraped.tiktok}`);
-  if (scraped.email) socials.push(`Email: ${scraped.email}`);
+  if (info.email) socials.push(`Email: ${info.email}`);
+
+  const effectiveLogo = logoImageUrl || scraped.logo || '';
 
   const prompt = `You are an expert web developer. Generate a complete, single-file HTML website for a local business using ALL the real data provided below.
 
 BUSINESS DATA:
-- Name: ${richData.name}
+- Name: ${info.name}
 - Type: ${biztype}
-- Address: ${richData.formatted_address || 'Local business'}
-- Phone: ${richData.formatted_phone_number || richData.international_phone_number || 'Contact us'}
+- Address: ${info.address}
+- Phone: ${info.phone}
+${info.email ? `- Email: ${info.email}` : ''}
+${info.tagline ? `- Tagline: ${info.tagline}` : ''}
 - Rating: ${richData.rating || 'N/A'} stars from ${richData.user_ratings_total || 0} reviews
 - Business description: ${scraped.description || richData.editorial_summary?.overview || 'Professional local ' + biztype}
-- Opening hours:\n${hoursText}
-${reviews ? '- Real customer reviews:\n' + reviews : ''}
-${socials.length ? '- Social media:\n' + socials.join('\n') : ''}
+- Opening hours:
+${hoursText}
+${reviewsText ? `- Real customer reviews:\n${reviewsText}` : ''}
+${socials.length ? `- Social media:\n${socials.join('\n')}` : ''}
 ${richData.delivery ? '- Offers delivery' : ''}
 ${richData.takeout ? '- Offers takeaway' : ''}
 ${richData.reservable ? '- Takes reservations' : ''}
-${photoUrls.length ? '- Real business photos (use as img src in hero/about sections):\n' + photoUrls.join('\n') : ''}
-${scraped.logo ? '- Logo image URL: ' + scraped.logo : ''}
-${logoSvg ? '- Generated SVG logo (embed this directly in the HTML where the logo appears):\n' + logoSvg : ''}
+${photoUrls.length ? `- Business photos (use as <img src> in hero and gallery):\n${photoUrls.join('\n')}` : ''}
+${effectiveLogo ? `- Logo image URL (use as <img src> in the header): ${effectiveLogo}` : ''}
+
+SECTIONS TO INCLUDE (in this order, include ONLY these sections): ${sections.join(', ')}
+
+${scheme ? `COLOUR SCHEME — "${scheme.name}":
+Primary: ${scheme.primary}
+Secondary: ${scheme.secondary}
+Accent: ${scheme.accent}
+Background: ${scheme.bg}
+Body text: ${scheme.text}
+Use these exact hex colours throughout — do not substitute.` : `Use a colour scheme appropriate for a ${biztype} business.`}
 
 REQUIREMENTS:
 - Single HTML file with embedded CSS and JS
 - Professional, modern design for a ${biztype} business
 - Include ALL real data above — hours, phone, address, reviews, social links
-- ${photoUrls.length ? 'Use the real business photos as hero background and in the about/gallery section using <img> tags with the provided URLs' : 'Use CSS gradients for hero background — no placeholder images'}
-- ${scraped.logo ? 'Use the provided logo image URL in the header' : logoSvg ? 'Embed the provided SVG logo directly in the header — do not use an img tag for it' : 'Create a clean text-based logo in the header'}
-- Sections: Hero, About, Services, Opening Hours, Reviews (use the real ones), Contact
-- If social media links exist, show real clickable links in footer and header
+- ${photoUrls.length ? 'Use the provided business photos as <img> tags in the hero and gallery' : 'Use CSS gradients for hero — no placeholder images'}
+- ${effectiveLogo ? 'Use the provided logo URL as an <img> in the header' : 'Create a clean text-based logo in the header'}
+- ${info.tagline ? `Use "${info.tagline}" as the hero tagline/subtitle` : ''}
 - Phone number must be a clickable tel: link
 - Mobile responsive
 - Use Google Fonts (load from CDN)
-- Color scheme appropriate for a ${biztype}
 - ALL nav links use anchor links only (href="#about" etc) — never external URLs
 - Logo/home link uses href="#" only
 - Smooth scroll navigation
@@ -637,19 +826,13 @@ REQUIREMENTS:
     });
     const data = await response.json();
 
-    if (data.error) {
-      throw new Error(JSON.stringify(data.error));
-    }
-    if (!data.content) {
-      throw new Error('No content returned. Full response: ' + JSON.stringify(data));
-    }
+    if (data.error) throw new Error(JSON.stringify(data.error));
+    if (!data.content) throw new Error('No content returned. Full response: ' + JSON.stringify(data));
 
     let html = data.content.map(b => b.text || '').join('');
     html = html.replace(/```html/g, '').replace(/```/g, '').trim();
 
-    if (!html) {
-      throw new Error('Empty HTML generated. Response: ' + JSON.stringify(data));
-    }
+    if (!html) throw new Error('Empty HTML generated. Response: ' + JSON.stringify(data));
 
     currentHTML = html;
     showPreview(html, biz.name);
@@ -864,21 +1047,22 @@ function showBrandingPreview(name) {
 function showPreview(html, name) {
   const slug = name.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'');
   document.getElementById('modalBody').innerHTML = `
-    <div style="text-align:center;padding:40px 20px;">
-      <div style="font-size:48px;margin-bottom:16px;">✅</div>
-      <h3 style="font-family:'Syne',sans-serif;font-size:20px;margin-bottom:12px;color:var(--accent);">Website Generated!</h3>
-      <p style="color:var(--muted);font-size:14px;margin-bottom:8px;">A professional website for <strong style="color:var(--text);">${escHtml(name)}</strong> is ready.</p>
-      <p style="color:var(--muted);font-size:13px;margin-bottom:32px;">Download it, open in Chrome to preview, then pitch it to the business.</p>
-      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:16px;margin-bottom:16px;text-align:left;">
-        <p style="font-size:11px;color:var(--muted);margin-bottom:6px;font-family:'DM Mono',monospace;letter-spacing:0.05em;">SUGGESTED DOMAIN</p>
-        <p style="font-size:15px;color:var(--accent);font-family:'DM Mono',monospace;">www.${slug}.co.uk</p>
+    <div style="padding:16px 0 8px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div>
+        <span style="font-size:13px;color:var(--accent);font-family:'DM Mono',monospace;letter-spacing:0.06em;">✦ WEBSITE READY</span>
+        <p style="font-size:13px;color:var(--muted);margin-top:2px;">Suggested domain: <span style="color:var(--accent);font-family:'DM Mono',monospace;">www.${slug}.co.uk</span></p>
       </div>
-      <div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.15);border-radius:6px;padding:16px;text-align:left;">
-        <p style="font-size:11px;color:var(--muted);margin-bottom:6px;font-family:'DM Mono',monospace;letter-spacing:0.05em;">PITCH TIP</p>
-        <p style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.6;">Download the file, open in Chrome to preview, call the business, offer to go live for £200-£500</p>
+    </div>
+    <div class="website-preview">
+      <div class="preview-bar">
+        <div class="preview-dots"><span class="d1"></span><span class="d2"></span><span class="d3"></span></div>
+        <div class="preview-url">www.${slug}.co.uk</div>
       </div>
+      <iframe id="resultPreviewFrame" style="width:100%;height:520px;border:none;background:#fff;" sandbox="allow-scripts allow-same-origin"></iframe>
     </div>`;
   document.getElementById('modalFooter').style.display = 'flex';
+  // Use srcdoc to render the generated HTML inline (works even on Netlify)
+  document.getElementById('resultPreviewFrame').srcdoc = html;
 }
 
 function openModal(name) {
@@ -1016,6 +1200,321 @@ function closeEditor() {
   document.getElementById('editorOverlay').style.display = 'none';
   // Sync any edits back to currentHTML so download from modal stays fresh
   if (editorCM) currentHTML = editorCM.getValue();
+}
+
+// ── CONTROL SCREEN ──────────────────────────────────────────────────────────
+const COLOR_SCHEMES = [
+  { id:'navy-gold',     name:'Navy & Gold',    colors:['#1B2A4A','#C9A84C','#F8F6F0'], primary:'#1B2A4A', secondary:'#C9A84C', accent:'#C9A84C', bg:'#F8F6F0', text:'#1B2A4A' },
+  { id:'forest-green',  name:'Forest Green',   colors:['#2D5A27','#6A994E','#F4F9F0'], primary:'#2D5A27', secondary:'#6A994E', accent:'#6A994E', bg:'#F4F9F0', text:'#1A3310' },
+  { id:'slate-grey',    name:'Slate Grey',     colors:['#3D4856','#546E7A','#F5F7F8'], primary:'#3D4856', secondary:'#546E7A', accent:'#546E7A', bg:'#F5F7F8', text:'#263238' },
+  { id:'warm-red',      name:'Warm Red',       colors:['#C0392B','#E67E22','#FEF9F8'], primary:'#C0392B', secondary:'#E67E22', accent:'#E74C3C', bg:'#FEF9F8', text:'#2C1810' },
+  { id:'ocean-blue',    name:'Ocean Blue',     colors:['#1565C0','#0288D1','#F0F7FF'], primary:'#1565C0', secondary:'#0288D1', accent:'#0288D1', bg:'#F0F7FF', text:'#0D1B3E' },
+  { id:'monochrome',    name:'Monochrome',     colors:['#1A1A1A','#555555','#FFFFFF'], primary:'#1A1A1A', secondary:'#555555', accent:'#333333', bg:'#FFFFFF',  text:'#111111' },
+];
+
+const TAGLINE_SUGGESTIONS = {
+  'restaurant':'Great food, great times.', 'cafe':'Your favourite local coffee spot.',
+  'plumber':'Fast, reliable plumbing you can trust.', 'electrician':'Safe, professional electrical services.',
+  'hair salon':'Look and feel your best.', 'gym':'Your journey starts here.',
+  'dentist':'Caring for your smile.', 'florist':'Beautiful flowers for every occasion.',
+  'dog groomer':'Keeping tails wagging.', 'painter decorator':'Transforming spaces, one brushstroke at a time.',
+  'cleaning service':'Spotless results, every time.', 'mechanic':'Keeping you on the road.',
+  'landscaper':'Bringing your garden to life.', 'accountant':'Numbers you can count on.',
+  'solicitor':'Expert legal advice, simplified.', 'physiotherapist':'Helping you move better.',
+  'estate agent':'Finding you the perfect home.', 'takeaway':'Delicious food, delivered fast.',
+  'carpenter':'Crafted with care.', 'chiropractor':'Back to feeling great.',
+};
+
+let controlData = {};
+let selectedColorScheme = COLOR_SCHEMES[0].id;
+let controlBiztype = '';
+
+function setProgress(pct, text) {
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('controlProgressText').textContent = text;
+}
+
+async function openControlScreen(biz, biztype) {
+  currentBiz = biz;
+  controlBiztype = biztype;
+  controlData = { biz, biztype };
+  selectedColorScheme = COLOR_SCHEMES[0].id;
+
+  document.getElementById('controlBizName').textContent = biz.name;
+  document.getElementById('controlBody').innerHTML = '';
+  document.getElementById('buildBtn').disabled = true;
+  document.getElementById('buildBtnHint').textContent = 'Loading business data...';
+  setProgress(0, 'Fetching business details...');
+  document.getElementById('controlOverlay').style.display = 'flex';
+
+  let richData = biz;
+  let photoUrls = [];
+  let scraped = {};
+
+  // Step 1: rich details
+  if (biz.place_id && !biz.place_id.startsWith('TEST_')) {
+    try {
+      const r = await fetch(`${API_BASE}/details?place_id=${biz.place_id}`);
+      const j = await r.json();
+      if (j.result) richData = { ...biz, ...j.result };
+    } catch(e) {}
+  }
+  setProgress(30, 'Fetching business photos...');
+  controlData.richData = richData;
+
+  // Step 2: all photos (up to 10)
+  if (richData.photos && richData.photos.length > 0) {
+    const results = await Promise.all(
+      richData.photos.slice(0, 10).map(async p => {
+        try {
+          const r = await fetch(`${API_BASE}/photo?ref=${p.photo_reference}&maxwidth=800`);
+          const j = await r.json();
+          return j.photo_url || null;
+        } catch { return null; }
+      })
+    );
+    photoUrls = results.filter(Boolean);
+  }
+  setProgress(65, 'Scanning web presence...');
+  controlData.photoUrls = photoUrls;
+
+  // Step 3: scrape
+  if (richData.website) {
+    try {
+      const r = await fetch(`${API_BASE}/scrape?url=${encodeURIComponent(richData.website)}`);
+      scraped = await r.json();
+    } catch(e) {}
+  }
+  controlData.scraped = scraped;
+  controlData.logoChoice = scraped.logo ? 'existing' : 'none';
+  controlData.logoValue = scraped.logo || null;
+
+  setProgress(100, 'Ready');
+  populateControlScreen();
+}
+
+function populateControlScreen() {
+  const { richData, photoUrls, scraped, biztype } = controlData;
+  const biz = controlData.biz;
+  const isRestaurant = ['restaurant', 'cafe', 'takeaway'].includes(biztype);
+  const tagline = TAGLINE_SUGGESTIONS[biztype] || `Your local ${biztype} specialists.`;
+  const defaultSections = ['Hero', 'About', 'Services', 'Opening Hours', 'Reviews', 'Gallery', 'Contact'];
+  if (isRestaurant) defaultSections.push('Menu');
+
+  document.getElementById('controlBody').innerHTML = `
+    <div class="ctrl-section">
+      <div class="ctrl-section-label">1 — Business Info</div>
+      <div class="ctrl-fields">
+        <div class="ctrl-field full"><label>Business Name</label><input class="ctrl-input" id="ci-name" value="${escHtml(richData.name || biz.name)}"/></div>
+        <div class="ctrl-field full"><label>Tagline (AI suggested)</label><input class="ctrl-input" id="ci-tagline" value="${escHtml(tagline)}"/></div>
+        <div class="ctrl-field"><label>Phone Number</label><input class="ctrl-input" id="ci-phone" value="${escHtml(richData.formatted_phone_number || '')}"/></div>
+        <div class="ctrl-field"><label>Email</label><input class="ctrl-input" id="ci-email" value="${escHtml(scraped.email || '')}"/></div>
+        <div class="ctrl-field full"><label>Address</label><input class="ctrl-input" id="ci-address" value="${escHtml(richData.formatted_address || '')}"/></div>
+      </div>
+    </div>
+
+    <div class="ctrl-section">
+      <div class="ctrl-section-label">2 — Photo Picker <span style="color:var(--danger);">*</span></div>
+      <div id="photoGrid" class="photo-grid">
+        ${photoUrls.length === 0
+          ? '<p style="font-size:13px;color:var(--muted);font-family:\'DM Mono\',monospace;">No Google Business photos found for this listing.</p>'
+          : photoUrls.map((url, i) => `
+            <div class="photo-thumb${i === 0 ? ' selected' : ''}" data-url="${escHtml(url)}" onclick="togglePhoto(this)">
+              <img src="${escHtml(url)}" loading="lazy" alt=""/>
+              <div class="photo-check">✓</div>
+            </div>`).join('')}
+      </div>
+      ${scraped.instagram ? `<p style="font-size:12px;color:var(--muted);margin-top:4px;">Instagram: <a href="${escHtml(scraped.instagram)}" target="_blank" style="color:var(--accent);">${escHtml(scraped.instagram)}</a></p>` : ''}
+    </div>
+
+    <div class="ctrl-section">
+      <div class="ctrl-section-label">3 — Sections</div>
+      <div class="sections-grid">
+        ${defaultSections.map(s => `
+          <label class="section-toggle">
+            <input type="checkbox" checked data-section="${s}"/>
+            <span>${s}</span>
+          </label>`).join('')}
+      </div>
+    </div>
+
+    <div class="ctrl-section">
+      <div class="ctrl-section-label">4 — Colour Scheme</div>
+      <div class="colour-grid">
+        ${COLOR_SCHEMES.map(cs => `
+          <div class="colour-card${cs.id === selectedColorScheme ? ' selected' : ''}" data-scheme="${cs.id}" onclick="selectColourScheme('${cs.id}')">
+            <div class="colour-swatches">${cs.colors.map(c => `<div class="colour-swatch" style="background:${c};"></div>`).join('')}</div>
+            <div class="colour-card-name">${cs.name}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="ctrl-section">
+      <div class="ctrl-section-label">5 — Reviews (select up to 3)</div>
+      <div style="display:flex;flex-direction:column;gap:8px;" id="reviewsList">
+        ${(richData.reviews || []).length === 0
+          ? '<p style="font-size:13px;color:var(--muted);">No reviews found for this business.</p>'
+          : (richData.reviews || []).slice(0, 8).map((r, i) => `
+            <label class="review-pick${i < 3 ? ' selected' : ''}" onclick="handleReviewClick(this, event)">
+              <input type="checkbox" ${i < 3 ? 'checked' : ''} data-idx="${i}"/>
+              <div class="review-pick-body">
+                <div class="review-pick-header">
+                  <span class="review-pick-author">${escHtml(r.author_name)}</span>
+                  <span class="review-pick-stars">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</span>
+                </div>
+                <div class="review-pick-text">${escHtml((r.text || '').substring(0, 160))}${(r.text || '').length > 160 ? '…' : ''}</div>
+              </div>
+            </label>`).join('')}
+      </div>
+    </div>
+
+    <div class="ctrl-section">
+      <div class="ctrl-section-label">6 — Logo</div>
+      <div id="logoSection">${renderLogoSection()}</div>
+    </div>
+  `;
+
+  updateBuildButton();
+}
+
+function renderLogoSection() {
+  const scraped = controlData.scraped || {};
+  if (controlData.logoChoice === 'generated' && controlData.logoValue) {
+    return `<div class="logo-preview-box">
+      <div class="logo-img-frame"><img src="${escHtml(controlData.logoValue)}" alt="Generated Logo"/></div>
+      <div class="logo-actions">
+        <p style="color:var(--accent);">✦ Generated with Ideogram</p>
+        <button class="logo-btn active">✓ Using This Logo</button>
+        <button class="logo-btn" onclick="generateLogo()">↺ Regenerate</button>
+        ${scraped.logo ? `<button class="logo-btn" onclick="revertToOriginalLogo()">← Use Original</button>` : ''}
+      </div>
+    </div>`;
+  }
+  if (scraped.logo) {
+    return `<div class="logo-preview-box">
+      <div class="logo-img-frame"><img src="${escHtml(scraped.logo)}" alt="Logo"/></div>
+      <div class="logo-actions">
+        <p>Logo found on existing web presence.</p>
+        <button class="logo-btn active" id="keepLogoBtn" onclick="setLogoChoice('existing')">✓ Keep This Logo</button>
+        <button class="logo-btn" id="regenLogoBtn" onclick="generateLogo()">↺ Generate New Logo</button>
+      </div>
+    </div>`;
+  }
+  return `<div class="logo-none-box">
+    <p>No logo found. Generate one with Ideogram AI.</p>
+    <button class="logo-btn" id="genLogoBtn" onclick="generateLogo()">✦ Generate Logo</button>
+  </div>`;
+}
+
+function togglePhoto(el) {
+  el.classList.toggle('selected');
+  updateBuildButton();
+}
+
+function updateBuildButton() {
+  const selected = document.querySelectorAll('.photo-thumb.selected').length;
+  const hasPhotos = document.querySelectorAll('.photo-thumb').length > 0;
+  const btn = document.getElementById('buildBtn');
+  const hint = document.getElementById('buildBtnHint');
+  if (!hasPhotos) {
+    // No photos available — still allow generating without photos
+    btn.disabled = false;
+    hint.textContent = 'No photos available — will generate without images';
+    return;
+  }
+  if (selected === 0) {
+    btn.disabled = true;
+    hint.textContent = 'Select at least 1 photo to continue';
+  } else {
+    btn.disabled = false;
+    hint.textContent = `${selected} photo${selected !== 1 ? 's' : ''} selected`;
+  }
+}
+
+function selectColourScheme(id) {
+  selectedColorScheme = id;
+  document.querySelectorAll('.colour-card').forEach(el => {
+    el.classList.toggle('selected', el.dataset.scheme === id);
+  });
+}
+
+function handleReviewClick(el, e) {
+  if (e.target.type === 'checkbox') return; // let checkbox handle itself
+  const cb = el.querySelector('input[type=checkbox]');
+  const checkedCount = document.querySelectorAll('#reviewsList input:checked').length;
+  if (!cb.checked && checkedCount >= 3) return; // cap at 3
+  cb.checked = !cb.checked;
+  el.classList.toggle('selected', cb.checked);
+}
+
+function setLogoChoice(type) {
+  controlData.logoChoice = type;
+  document.getElementById('logoSection').innerHTML = renderLogoSection();
+}
+
+async function generateLogo() {
+  const { richData, biztype } = controlData;
+  const logoSection = document.getElementById('logoSection');
+  logoSection.innerHTML = `<div class="logo-none-box"><div class="spinner" style="width:24px;height:24px;border-width:2px;"></div><p style="margin-left:4px;">Generating logo with Ideogram...</p></div>`;
+
+  try {
+    const r = await fetch(`${API_BASE}/generate-logo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: richData.name, biztype })
+    });
+    const j = await r.json();
+    if (j.error) throw new Error(typeof j.error === 'object' ? JSON.stringify(j.error) : j.error);
+    // imageUrl = Ideogram (new server), svg = Claude fallback (old server still running)
+    const logoUrl = j.imageUrl || (j.svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(j.svg)}` : null);
+    if (!logoUrl) throw new Error('No logo returned. Raw: ' + JSON.stringify(j));
+    controlData.logoChoice = 'generated';
+    controlData.logoValue = logoUrl;
+    logoSection.innerHTML = renderLogoSection();
+  } catch(e) {
+    controlData.logoChoice = 'none';
+    controlData.logoValue = null;
+    logoSection.innerHTML = `<div class="logo-none-box" style="flex-direction:column;align-items:flex-start;gap:10px;">
+      <p style="color:var(--danger);">Logo generation failed: ${escHtml(e.message)}</p>
+      <button class="logo-btn" id="genLogoBtn" onclick="generateLogo()">↺ Try Again</button>
+    </div>`;
+  }
+}
+
+function revertToOriginalLogo() {
+  controlData.logoChoice = 'existing';
+  controlData.logoValue = controlData.scraped.logo;
+  document.getElementById('logoSection').innerHTML = renderLogoSection();
+}
+
+function closeControlScreen() {
+  document.getElementById('controlOverlay').style.display = 'none';
+  controlData = {};
+}
+
+function buildWebsite() {
+  const { richData, scraped, biztype } = controlData;
+
+  const info = {
+    name: document.getElementById('ci-name').value,
+    tagline: document.getElementById('ci-tagline').value,
+    phone: document.getElementById('ci-phone').value,
+    address: document.getElementById('ci-address').value,
+    email: document.getElementById('ci-email').value,
+  };
+
+  const selectedPhotos = [...document.querySelectorAll('.photo-thumb.selected')].map(el => el.dataset.url);
+  const sections = [...document.querySelectorAll('.section-toggle input:checked')].map(el => el.dataset.section);
+  const scheme = COLOR_SCHEMES.find(cs => cs.id === selectedColorScheme) || COLOR_SCHEMES[0];
+  const allReviews = richData.reviews || [];
+  const selectedReviews = [...document.querySelectorAll('#reviewsList input:checked')]
+    .map(el => allReviews[parseInt(el.dataset.idx)]).filter(Boolean);
+  const logo = { choice: controlData.logoChoice, value: controlData.logoValue };
+
+  const options = { info, selectedPhotos, sections, scheme, selectedReviews, logo, scraped };
+
+  closeControlScreen();
+  generateWebsite(richData, biztype, options);
 }
 </script>
 

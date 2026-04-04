@@ -113,40 +113,36 @@ function resolveUrl(href, baseUrl) {
   try { return new URL(href, baseUrl).href; } catch { return null; }
 }
 
-// Generate SVG logo using Claude
+// Generate logo using Ideogram API
 app.post('/generate-logo', async (req, res) => {
   try {
-    const { name, biztype, colors } = req.body;
-    if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not set' });
+    const { name, biztype } = req.body;
+    const IDEOGRAM_KEY = process.env.IDEOGRAM_KEY;
+    if (!IDEOGRAM_KEY) return res.status(500).json({ error: 'IDEOGRAM_KEY not set' });
 
-    const prompt = `Design a professional SVG logo for a ${biztype} business called "${name}".
+    const prompt = `Professional business logo for "${name}", a ${biztype} business. Clean, modern, minimal design. White background. Suitable for use on a website header.`;
 
-Requirements:
-- Output ONLY a valid SVG element, nothing else — no explanation, no markdown, no backticks
-- The SVG should be viewBox="0 0 300 100" (wide format, like a header logo)
-- Include a small relevant icon/symbol on the left
-- Business name text on the right of the icon
-- Use colors appropriate for a ${biztype} business: ${colors || 'professional and trustworthy'}
-- Clean, modern, professional design
-- Output the raw SVG starting with <svg and ending with </svg>`;
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.ideogram.ai/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01'
+        'Api-Key': IDEOGRAM_KEY
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: prompt }]
+        image_request: {
+          prompt,
+          aspect_ratio: 'ASPECT_1_1',
+          model: 'V_2',
+          style_type: 'DESIGN',
+          magic_prompt_option: 'ON'
+        }
       })
     });
+
     const data = await response.json();
-    let svg = data.content?.map(b => b.text || '').join('') || '';
-    svg = svg.replace(/```svg/g, '').replace(/```xml/g, '').replace(/```/g, '').trim();
-    res.json({ svg });
+    const imageUrl = data.data?.[0]?.url;
+    if (!imageUrl) return res.status(500).json({ error: 'No image returned from Ideogram', raw: data });
+    res.json({ imageUrl });
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
