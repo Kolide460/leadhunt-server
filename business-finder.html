@@ -221,6 +221,38 @@ iframe{width:100%;height:480px;border:none;background:#fff;}
 .live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-right:6px;animation:pulse 2s infinite;}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
 
+/* ── ASSETS PANEL (inside editor) ────────────────────────────────── */
+#editorMain{position:relative;}
+#assetsPanel{
+  position:absolute;right:0;top:0;bottom:0;width:300px;
+  background:var(--surface);border-left:1px solid var(--border);
+  display:none;flex-direction:column;z-index:10;
+  box-shadow:-6px 0 24px rgba(0,0,0,0.5);
+}
+#assetsPanelHead{
+  padding:12px 16px;background:var(--surface2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+}
+#assetsPanelHead h4{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;margin:0;}
+.ap-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:2px 6px;}
+.ap-close:hover{color:var(--text);}
+#assetsPanelBody{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px;}
+.ap-section-label{font-size:10px;color:var(--muted);font-family:'DM Mono',monospace;letter-spacing:0.1em;text-transform:uppercase;}
+.ap-logo-row{display:flex;align-items:center;gap:12px;}
+.ap-logo-frame{width:72px;height:72px;border-radius:6px;background:#fff;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;}
+.ap-logo-frame img{max-width:100%;max-height:100%;object-fit:contain;}
+.ap-btns{display:flex;flex-direction:column;gap:6px;}
+.ap-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:7px 12px;border-radius:5px;font-size:12px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:border-color 0.2s,color 0.2s;white-space:nowrap;text-align:center;display:inline-block;}
+.ap-btn:hover{border-color:var(--accent);color:var(--accent);}
+.ap-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.img-mgr-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.img-mgr-item{border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.img-mgr-item img{width:100%;height:68px;object-fit:cover;display:block;}
+.img-mgr-item.dimmed img{opacity:0.3;}
+.img-mgr-bar{display:flex;gap:4px;padding:5px;}
+.img-mgr-bar button{flex:1;background:var(--surface2);border:1px solid var(--border);color:var(--muted);padding:3px 0;border-radius:4px;font-size:10px;cursor:pointer;transition:all 0.15s;}
+.img-mgr-bar button:hover{border-color:var(--accent);color:var(--accent);}
+
 @media(max-width:900px){
   main{grid-template-columns:1fr;}
   .sidebar{border-right:none;border-bottom:1px solid var(--border);}
@@ -497,6 +529,8 @@ iframe{width:100%;height:480px;border:none;background:#fff;}
   <div id="editorHeader">
     <span id="editorTitle">Website Editor</span>
     <div class="editor-header-actions">
+      <button onclick="openLogoPanel()">🎨 Logo</button>
+      <button onclick="openImageManager()">🖼 Images</button>
       <button onclick="formatEditorCode()" title="Auto-format HTML">⌥ Format</button>
       <button onclick="refreshPreview()">↺ Refresh Preview</button>
       <button onclick="downloadFromEditor()">⬇ Download</button>
@@ -518,6 +552,14 @@ iframe{width:100%;height:480px;border:none;background:#fff;}
         <span style="color:var(--muted);font-size:10px;">Auto-updates as you type</span>
       </div>
       <iframe id="previewFrame" sandbox="allow-scripts allow-same-origin"></iframe>
+    </div>
+    <!-- ASSETS PANEL -->
+    <div id="assetsPanel">
+      <div id="assetsPanelHead">
+        <h4 id="assetsPanelTitle">Assets</h4>
+        <button class="ap-close" onclick="closeAssetsPanel()">✕</button>
+      </div>
+      <div id="assetsPanelBody"></div>
     </div>
   </div>
 </div>
@@ -696,7 +738,8 @@ async function generateWebsite(biz, biztype, options = null) {
     photoUrls = options.selectedPhotos || [];
     scraped = options.scraped || {};
     if (options.logo && options.logo.choice !== 'none' && options.logo.value) {
-      logoImageUrl = options.logo.value;
+      // Use token in prompt if uploaded base64 (replaced after generation)
+      logoImageUrl = options.logo.token || options.logo.value;
     }
   } else {
     // Legacy path: fetch everything now (used by test fixture / direct calls)
@@ -905,6 +948,10 @@ REQUIREMENTS:
     let html = accumulated.replace(/```html/g, '').replace(/```/g, '').trim();
     if (!html) throw new Error('Empty HTML generated.');
 
+    // Replace uploaded logo token with actual base64
+    if (options?.logo?.token) {
+      html = html.split(options.logo.token).join(options.logo.value);
+    }
     // Replace custom photo tokens with base64 data URIs
     if (options?.customPhotos?.length) {
       for (const { token, dataUri } of options.customPhotos) {
@@ -1539,30 +1586,47 @@ function populateControlScreen() {
 
 function renderLogoSection() {
   const scraped = controlData.scraped || {};
+  const fileInput = `<input type="file" id="logoUploadInput" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" style="display:none" onchange="handleLogoUpload(this)"/>`;
+
+  if (controlData.logoChoice === 'uploaded' && controlData.logoValue) {
+    return `${fileInput}<div class="logo-preview-box">
+      <div class="logo-img-frame"><img src="${escHtml(controlData.logoValue)}" alt="Uploaded Logo"/></div>
+      <div class="logo-actions">
+        <p style="color:var(--accent);">✦ Your uploaded logo</p>
+        <label class="logo-btn active" style="cursor:pointer" for="logoUploadInput">↺ Change Logo</label>
+        <button class="logo-btn" onclick="controlData.logoChoice='none';controlData.logoValue=null;document.getElementById('logoSection').innerHTML=renderLogoSection()">✕ Remove</button>
+      </div>
+    </div>`;
+  }
   if (controlData.logoChoice === 'generated' && controlData.logoValue) {
-    return `<div class="logo-preview-box">
+    return `${fileInput}<div class="logo-preview-box">
       <div class="logo-img-frame"><img src="${escHtml(controlData.logoValue)}" alt="Generated Logo"/></div>
       <div class="logo-actions">
         <p style="color:var(--accent);">✦ Generated with Ideogram</p>
         <button class="logo-btn active">✓ Using This Logo</button>
         <button class="logo-btn" onclick="generateLogo()">↺ Regenerate</button>
         ${scraped.logo ? `<button class="logo-btn" onclick="revertToOriginalLogo()">← Use Original</button>` : ''}
+        <label class="logo-btn" style="cursor:pointer" for="logoUploadInput">⬆ Upload Own</label>
       </div>
     </div>`;
   }
   if (scraped.logo) {
-    return `<div class="logo-preview-box">
+    return `${fileInput}<div class="logo-preview-box">
       <div class="logo-img-frame"><img src="${escHtml(scraped.logo)}" alt="Logo"/></div>
       <div class="logo-actions">
         <p>Logo found on existing web presence.</p>
-        <button class="logo-btn active" id="keepLogoBtn" onclick="setLogoChoice('existing')">✓ Keep This Logo</button>
-        <button class="logo-btn" id="regenLogoBtn" onclick="generateLogo()">↺ Generate New Logo</button>
+        <button class="logo-btn active" onclick="setLogoChoice('existing')">✓ Keep This Logo</button>
+        <button class="logo-btn" onclick="generateLogo()">↺ Generate New</button>
+        <label class="logo-btn" style="cursor:pointer" for="logoUploadInput">⬆ Upload Own</label>
       </div>
     </div>`;
   }
-  return `<div class="logo-none-box">
-    <p>No logo found. Generate one with Ideogram AI.</p>
-    <button class="logo-btn" id="genLogoBtn" onclick="generateLogo()">✦ Generate Logo</button>
+  return `${fileInput}<div class="logo-none-box" style="flex-direction:column;align-items:flex-start;gap:10px;">
+    <p>No logo found. Generate one with AI or upload your own.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="logo-btn" onclick="generateLogo()">✦ Generate with Ideogram</button>
+      <label class="logo-btn" style="cursor:pointer" for="logoUploadInput">⬆ Upload Your Own</label>
+    </div>
   </div>`;
 }
 
@@ -1580,7 +1644,12 @@ async function handlePhotoUpload(input) {
   const placeholder = grid.querySelector('p');
   if (placeholder) placeholder.remove();
 
-  for (const file of files) {
+  const existing = grid.querySelectorAll('.photo-thumb[data-custom]').length;
+  const canAdd = Math.max(0, 10 - existing);
+  const toAdd = files.slice(0, canAdd);
+  if (toAdd.length < files.length) alert(`Max 10 uploaded photos — adding first ${canAdd}.`);
+
+  for (const file of toAdd) {
     const dataUri = await compressImage(file);
     const thumb = document.createElement('div');
     thumb.className = 'photo-thumb selected';
@@ -1610,6 +1679,27 @@ function compressImage(file) {
     };
     img.src = objUrl;
   });
+}
+
+function fileToDataUri(file) {
+  if (file.type === 'image/svg+xml') {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.readAsDataURL(file);
+    });
+  }
+  return compressImage(file);
+}
+
+async function handleLogoUpload(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const dataUri = await fileToDataUri(file);
+  controlData.logoChoice = 'uploaded';
+  controlData.logoValue = dataUri;
+  input.value = '';
+  document.getElementById('logoSection').innerHTML = renderLogoSection();
 }
 
 function updateBuildButton() {
@@ -1717,12 +1807,195 @@ function buildWebsite() {
   const allReviews = richData.reviews || [];
   const selectedReviews = [...document.querySelectorAll('#reviewsList input:checked')]
     .map(el => allReviews[parseInt(el.dataset.idx)]).filter(Boolean);
-  const logo = { choice: controlData.logoChoice, value: controlData.logoValue };
+  // If user uploaded a logo as base64, use a token in the prompt to keep it small — replaced after generation
+  const logoVal = controlData.logoValue;
+  const logoChoice = controlData.logoChoice;
+  const logo = (logoChoice === 'uploaded' && logoVal && logoVal.startsWith('data:'))
+    ? { choice: 'uploaded', value: logoVal, token: 'UPLOADED_LOGO_0' }
+    : { choice: logoChoice, value: logoVal };
 
   const options = { info, selectedPhotos, customPhotos, sections, scheme, selectedReviews, logo, scraped };
 
   closeControlScreen();
   generateWebsite(richData, biztype, options);
+}
+
+// ── EDITOR ASSET FUNCTIONS ───────────────────────────────────────────────────
+
+function getEditorHTML() { return editorCM ? editorCM.getValue() : currentHTML; }
+function setEditorHTML(html) { if (editorCM) editorCM.setValue(html); else currentHTML = html; }
+
+function scanImagesFromHTML(html) {
+  const results = [];
+  const re = /<img[^>]+src="([^"]+)"[^>]*/gi;
+  let m;
+  while ((m = re.exec(html)) !== null) results.push({ src: m[1] });
+  return results;
+}
+
+function scanLogoFromHTML(html) {
+  // First img inside a <header> or <nav> block
+  const hm = html.match(/<(?:header|nav)\b[^>]*>([\s\S]*?)<\/(?:header|nav)>/i);
+  if (hm) {
+    const im = hm[1].match(/<img[^>]+src="([^"]+)"/i);
+    if (im) return im[1];
+  }
+  // Fallback: first img tag
+  const fallback = html.match(/<img[^>]+src="([^"]+)"/i);
+  return fallback ? fallback[1] : null;
+}
+
+function replaceImgSrcInHTML(html, oldSrc, newSrc) {
+  // Escape special chars in oldSrc for splitting
+  return html.split(`src="${oldSrc}"`).join(`src="${newSrc}"`);
+}
+
+function closeAssetsPanel() {
+  document.getElementById('assetsPanel').style.display = 'none';
+}
+
+function openLogoPanel() {
+  if (!currentHTML) return;
+  const html = getEditorHTML();
+  const logoSrc = scanLogoFromHTML(html);
+
+  document.getElementById('assetsPanelTitle').textContent = 'Logo';
+  document.getElementById('assetsPanelBody').innerHTML = `
+    <div class="ap-section-label">Current Logo</div>
+    <div class="ap-logo-row">
+      <div class="ap-logo-frame">
+        ${logoSrc
+          ? `<img src="${escHtml(logoSrc)}" alt="Logo"/>`
+          : '<span style="font-size:10px;color:var(--muted);text-align:center;padding:4px;">Not found</span>'}
+      </div>
+      <div class="ap-btns">
+        <label class="ap-btn" style="cursor:pointer" for="apLogoUpload">⬆ Upload Logo</label>
+        <input type="file" id="apLogoUpload" accept=".png,.jpg,.jpeg,.svg,image/*" style="display:none" onchange="uploadEditorLogo(this)"/>
+        <button class="ap-btn" onclick="regenerateEditorLogo(this)">✦ Regenerate AI</button>
+      </div>
+    </div>
+    ${logoSrc
+      ? `<p style="font-size:10px;color:var(--muted);word-break:break-all;margin-top:-4px;">${logoSrc.startsWith('data:') ? 'Embedded · ' + Math.round(logoSrc.length/1024) + ' KB' : escHtml(logoSrc.substring(0,60)) + (logoSrc.length > 60 ? '…' : '')}</p>`
+      : ''}
+  `;
+  document.getElementById('assetsPanel').style.display = 'flex';
+}
+
+async function uploadEditorLogo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const dataUri = await fileToDataUri(file);
+  const html = getEditorHTML();
+  const logoSrc = scanLogoFromHTML(html);
+  if (!logoSrc) { alert('Could not find a logo img tag in the page header.'); input.value = ''; return; }
+  setEditorHTML(replaceImgSrcInHTML(html, logoSrc, dataUri));
+  input.value = '';
+  openLogoPanel();
+}
+
+async function regenerateEditorLogo(btn) {
+  if (!currentBiz) { alert('No business loaded.'); return; }
+  btn.disabled = true;
+  btn.textContent = 'Generating…';
+  try {
+    const r = await fetch(`${API_BASE}/generate-logo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: currentBiz.name, biztype: controlBiztype || 'business' })
+    });
+    const j = await r.json();
+    if (j.error) throw new Error(j.error);
+    const logoUrl = j.imageUrl;
+    if (!logoUrl) throw new Error('No logo returned');
+    const html = getEditorHTML();
+    const logoSrc = scanLogoFromHTML(html);
+    if (!logoSrc) throw new Error('Could not find logo in the page');
+    setEditorHTML(replaceImgSrcInHTML(html, logoSrc, logoUrl));
+    openLogoPanel();
+  } catch(e) {
+    alert('Logo generation failed: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '✦ Regenerate AI';
+  }
+}
+
+function openImageManager() {
+  if (!currentHTML) return;
+  const html = getEditorHTML();
+  const images = scanImagesFromHTML(html);
+
+  document.getElementById('assetsPanelTitle').textContent = `Images (${images.length})`;
+
+  if (images.length === 0) {
+    document.getElementById('assetsPanelBody').innerHTML =
+      '<p style="font-size:13px;color:var(--muted);">No images found in the generated website.</p>';
+    document.getElementById('assetsPanel').style.display = 'flex';
+    return;
+  }
+
+  const grid = images.map((img, i) => `
+    <div class="img-mgr-item" id="imgItem_${i}" data-src="${escHtml(img.src)}" data-hidden="0">
+      <img src="${escHtml(img.src)}" loading="lazy"
+           onerror="this.style.background='#333';this.removeAttribute('src')" alt=""/>
+      <div class="img-mgr-bar">
+        <button onclick="triggerImgReplace(${i})">Replace</button>
+        <button onclick="toggleImgInEditor(${i})" id="imgToggleBtn_${i}">Hide</button>
+      </div>
+      <input type="file" id="imgReplaceFile_${i}" accept="image/*" style="display:none" onchange="handleImgReplace(this,${i})"/>
+    </div>`).join('');
+
+  document.getElementById('assetsPanelBody').innerHTML = `
+    <div class="ap-section-label">${images.length} images — click Replace to swap any image</div>
+    <div class="img-mgr-grid">${grid}</div>`;
+  document.getElementById('assetsPanel').style.display = 'flex';
+}
+
+function triggerImgReplace(i) {
+  document.getElementById(`imgReplaceFile_${i}`).click();
+}
+
+async function handleImgReplace(input, i) {
+  const file = input.files[0];
+  if (!file) return;
+  const dataUri = await compressImage(file);
+  const item = document.getElementById(`imgItem_${i}`);
+  const oldSrc = item.dataset.src;
+  const html = getEditorHTML();
+  setEditorHTML(replaceImgSrcInHTML(html, oldSrc, dataUri));
+  item.querySelector('img').src = dataUri;
+  item.dataset.src = dataUri;
+  input.value = '';
+}
+
+function toggleImgInEditor(i) {
+  const item = document.getElementById(`imgItem_${i}`);
+  const btn = document.getElementById(`imgToggleBtn_${i}`);
+  const src = item.dataset.src;
+  const isHidden = item.dataset.hidden === '1';
+  let html = getEditorHTML();
+
+  if (isHidden) {
+    // Remove display:none style we added — look for our marker comment
+    html = html.replace(`<!-- hidden:${i} -->`, '').replace(`<!-- /hidden:${i} -->`, '');
+    // Also strip any display:none wrapper div we added
+    const wrapRe = new RegExp(`<div style="display:none" data-hid="${i}">(.*?)<\\/div>`, 's');
+    html = html.replace(wrapRe, '$1');
+    item.dataset.hidden = '0';
+    item.classList.remove('dimmed');
+    btn.textContent = 'Hide';
+  } else {
+    // Wrap the matching img tag with a hidden div marker
+    const escapedSrc = src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    html = html.replace(
+      new RegExp(`(<img[^>]+src="${escapedSrc}"[^>]*>)`, 'i'),
+      `<div style="display:none" data-hid="${i}">$1</div>`
+    );
+    item.dataset.hidden = '1';
+    item.classList.add('dimmed');
+    btn.textContent = 'Show';
+  }
+
+  setEditorHTML(html);
 }
 </script>
 
