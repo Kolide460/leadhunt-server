@@ -148,35 +148,42 @@ app.post('/generate-logo', async (req, res) => {
   }
 });
 
-// Generate a single branding image via DALL-E 3
-// Requires OPENAI_KEY environment variable on Render
+// Generate a single branding image via Ideogram
 app.post('/generate-image', async (req, res) => {
   try {
     const { prompt, size = '1024x1024' } = req.body;
-    const OPENAI_KEY = process.env.OPENAI_KEY;
-    if (!OPENAI_KEY) return res.status(500).json({ error: 'OPENAI_KEY not set on server. Add it in Render environment variables.' });
+    const IDEOGRAM_KEY = process.env.IDEOGRAM_KEY;
+    if (!IDEOGRAM_KEY) return res.status(500).json({ error: 'Ideogram API key not configured on server' });
 
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
+    // Map pixel dimensions to Ideogram aspect ratio tokens
+    const aspectMap = {
+      '1024x1024': 'ASPECT_1_1',
+      '1792x1024': 'ASPECT_16_9',
+      '1024x1792': 'ASPECT_9_16',
+    };
+    const aspect_ratio = aspectMap[size] || 'ASPECT_1_1';
+
+    const response = await fetch('https://api.ideogram.ai/generate', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_KEY}`
+        'Api-Key': IDEOGRAM_KEY
       },
       body: JSON.stringify({
-        model: 'dall-e-3',
-        prompt,
-        n: 1,
-        size,
-        quality: 'standard',
-        response_format: 'b64_json'
+        image_request: {
+          prompt,
+          aspect_ratio,
+          model: 'V_2',
+          style_type: 'DESIGN',
+          magic_prompt_option: 'ON'
+        }
       })
     });
 
     const data = await response.json();
-    if (data.error) return res.status(500).json({ error: data.error.message });
-
-    const b64 = data.data[0].b64_json;
-    res.json({ dataUri: `data:image/png;base64,${b64}` });
+    const imageUrl = data.data?.[0]?.url;
+    if (!imageUrl) return res.status(500).json({ error: 'No image returned from Ideogram', raw: data });
+    res.json({ dataUri: imageUrl });
   } catch(e) {
     res.status(500).json({ error: e.message });
   }

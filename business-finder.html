@@ -777,6 +777,13 @@ async function generateWebsite(biz, biztype, options = null) {
 
   const prompt = `You are an expert web developer. Generate a complete, single-file HTML website for a local business using ALL the real data provided below.
 
+⚠️ CRITICAL — NAVIGATION LINKS (read this first):
+- Every <a> tag in the navigation must use a same-page anchor ONLY: href="#hero", href="#about", href="#services", href="#contact" etc.
+- The logo and any "home" link must use href="#" only — nothing else.
+- NEVER use a full URL, domain name, http://, https://, or any external link anywhere in the navigation.
+- Add exactly this CSS rule: html { scroll-behavior: smooth; }
+- Violation of these rules will break the page — follow them exactly.
+
 BUSINESS DATA:
 - Name: ${info.name}
 - Type: ${biztype}
@@ -816,10 +823,8 @@ REQUIREMENTS:
 - Phone number must be a clickable tel: link
 - Mobile responsive
 - Use Google Fonts (load from CDN)
-- ALL nav links use anchor links only (href="#about" etc) — never external URLs
-- Logo/home link uses href="#" only
-- Smooth scroll navigation
-- Output ONLY raw HTML, no markdown, no explanation`;
+- Navigation: anchor links only — see CRITICAL section above
+- Output ONLY raw HTML starting with <!DOCTYPE html>, no markdown, no explanation`;
 
   try {
     const response = await fetch(`${API_BASE}/generate`, {
