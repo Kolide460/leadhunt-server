@@ -218,7 +218,7 @@ app.post('/generate', async (req, res) => {
           'x-api-key': ANTHROPIC_KEY,
           'anthropic-version': '2023-06-01'
         },
-        signal: AbortSignal.timeout(120000),
+        signal: AbortSignal.timeout(300000),
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
           max_tokens: 16000,
