@@ -191,28 +191,86 @@ app.get('/debug', (req, res) => {
   });
 });
 
-// Generate website / branding kit
+// Generate website / branding kit — streams response as SSE to prevent timeout
 app.post('/generate', async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not set' });
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_KEY,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 16000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await response.json();
-    res.json(data);
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    let anthropicRes;
+    try {
+      anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': ANTHROPIC_KEY,
+          'anthropic-version': '2023-06-01'
+        },
+        signal: AbortSignal.timeout(120000),
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 16000,
+          stream: true,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+    } catch(fetchErr) {
+      res.write(`event: error\ndata: ${JSON.stringify({ error: fetchErr.message })}\n\n`);
+      res.end();
+      return;
+    }
+
+    if (!anthropicRes.ok) {
+      const errText = await anthropicRes.text();
+      res.write(`event: error\ndata: ${JSON.stringify({ error: errText })}\n\n`);
+      res.end();
+      return;
+    }
+
+    const reader = anthropicRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6);
+          if (raw === '[DONE]') continue;
+          try {
+            const evt = JSON.parse(raw);
+            if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+              res.write(`data: ${JSON.stringify({ text: evt.delta.text })}\n\n`);
+            } else if (evt.type === 'message_delta' && evt.delta?.stop_reason) {
+              res.write(`data: ${JSON.stringify({ stop_reason: evt.delta.stop_reason })}\n\n`);
+            } else if (evt.type === 'error') {
+              res.write(`event: error\ndata: ${JSON.stringify({ error: evt.error })}\n\n`);
+            }
+          } catch(e) { /* skip malformed SSE event */ }
+        }
+      }
+    } finally {
+      res.end();
+    }
+
   } catch(e) {
-    res.status(500).json({ error: e.message });
+    if (!res.headersSent) {
+      res.status(500).json({ error: e.message });
+    } else {
+      try { res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`); res.end(); } catch(_) {}
+    }
   }
 });
 
