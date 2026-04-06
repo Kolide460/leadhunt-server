@@ -762,11 +762,29 @@ async function initAuth() {
     history.replaceState({}, '', location.pathname);
   }
 
-  if (!authToken) { showAuthGate(); return; }
+  if (!authToken) {
+    // Try silent auto-login — works when ACCESS_PASSWORD is not set on server
+    try {
+      const res = await fetch(`${API_BASE}/auth`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: '' })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        authToken = data.token;
+        localStorage.setItem('lh_token', authToken);
+        updateUsageUI(data);
+        return;
+      }
+    } catch(e) { /* fall through */ }
+    showAuthGate();
+    return;
+  }
 
   // Verify existing token against server
   try {
-    const res = await apiFetch(`${API_BASE}/usage`, { headers: { 'X-Auth-Token': authToken } });
+    const res = await fetch(`${API_BASE}/usage`, { headers: { 'X-Auth-Token': authToken } });
     if (res.status === 401) {
       authToken = null;
       localStorage.removeItem('lh_token');
