@@ -1,30 +1,251 @@
 const express = require('express');
 const cors = require('cors');
+const crypto = require('crypto');
 const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const PLACES_KEY = process.env.PLACES_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
+const ACCESS_PASSWORD = process.env.ACCESS_PASSWORD;
+const FREE_SEARCH_LIMIT = 10;
 
-app.use(cors());
-app.use(express.json());
+// TOKEN_SECRET — must be set in prod or all sessions reset on restart
+const TOKEN_SECRET = process.env.TOKEN_SECRET || (() => {
+  if (process.env.NODE_ENV === 'production') {
+    console.warn('[WARN] TOKEN_SECRET not set — sessions will reset on every restart. Add it to Render env vars.');
+  }
+  return crypto.randomBytes(32).toString('hex');
+})();
 
-// Text Search
-app.get('/search', async (req, res) => {
+// ── SECURITY ─────────────────────────────────────────────────────────────────
+let helmet;
+try { helmet = require('helmet'); } catch(e) { helmet = null; }
+if (helmet) app.use(helmet());
+
+const ALLOWED_ORIGINS = [
+  'https://astounding-bubblegum-cff1c5.netlify.app',
+  'http://localhost:3000',
+  'http://localhost:5500',
+  'http://127.0.0.1:5500',
+  'null', // file:// in some browsers
+];
+
+app.use(cors({
+  origin(origin, cb) {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    cb(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST'],
+  allowedHeaders: ['Content-Type', 'X-Auth-Token'],
+}));
+
+app.use(express.json({ limit: '2mb' }));
+
+// Rate limiting
+let rateLimit;
+try { rateLimit = require('express-rate-limit'); } catch(e) { rateLimit = null; }
+
+const makeLimit = (windowMs, max) => rateLimit
+  ? rateLimit({ windowMs, max, standardHeaders: true, legacyHeaders: false })
+  : (_req, _res, next) => next();
+
+const generalLimiter = makeLimit(15 * 60 * 1000, 200); // 200 req / 15 min
+const searchLimiter  = makeLimit(60 * 1000, 20);        // 20 req / min
+const authLimiter    = makeLimit(60 * 1000, 10);        // 10 login attempts / min
+
+app.use(generalLimiter);
+
+// ── TOKEN UTILS ───────────────────────────────────────────────────────────────
+function signToken(payload) {
+  const data = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', TOKEN_SECRET).update(data).digest('base64url');
+  return `${data}.${sig}`;
+}
+
+function verifyToken(token) {
+  if (!token || typeof token !== 'string') return null;
+  const dot = token.lastIndexOf('.');
+  if (dot === -1) return null;
+  const data = token.slice(0, dot);
+  const sig  = token.slice(dot + 1);
+  const expected = crypto.createHmac('sha256', TOKEN_SECRET).update(data).digest('base64url');
+  if (sig !== expected) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(data, 'base64url').toString());
+    if (payload.expiresAt && Date.now() > payload.expiresAt) return null;
+    return payload;
+  } catch { return null; }
+}
+
+// ── IN-MEMORY USAGE TRACKING ──────────────────────────────────────────────────
+const usageMap = new Map(); // sessionId → { searches: number }
+
+function getUsage(sessionId) {
+  if (!usageMap.has(sessionId)) usageMap.set(sessionId, { searches: 0 });
+  return usageMap.get(sessionId);
+}
+
+// ── IN-MEMORY SEARCH CACHE ────────────────────────────────────────────────────
+const searchCache = new Map();
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+function getCached(key) {
+  const entry = searchCache.get(key);
+  if (!entry) return null;
+  if (Date.now() - entry.timestamp > CACHE_TTL) { searchCache.delete(key); return null; }
+  return entry.data;
+}
+
+function setCache(key, data) {
+  if (searchCache.size >= 500) searchCache.delete(searchCache.keys().next().value);
+  searchCache.set(key, { data, timestamp: Date.now() });
+}
+
+// ── AUTH MIDDLEWARE ───────────────────────────────────────────────────────────
+function requireAuth(req, res, next) {
+  if (!ACCESS_PASSWORD) return next(); // auth disabled if no password set
+  const token = req.headers['x-auth-token'];
+  const payload = verifyToken(token);
+  if (!payload) return res.status(401).json({ error: 'Not authenticated. Please log in.' });
+  req.session = payload;
+  next();
+}
+
+function checkUsageLimit(req, res, next) {
+  if (!req.session) return next();
+  const { sessionId, tier } = req.session;
+  if (tier === 'pro') return next();
+  const usage = getUsage(sessionId);
+  if (usage.searches >= FREE_SEARCH_LIMIT) {
+    return res.status(402).json({
+      error: 'Free search limit reached',
+      upgrade: true,
+      used: usage.searches,
+      limit: FREE_SEARCH_LIMIT,
+    });
+  }
+  next();
+}
+
+// ── POST /auth ────────────────────────────────────────────────────────────────
+app.post('/auth', authLimiter, (req, res) => {
+  if (!ACCESS_PASSWORD) {
+    // Dev mode — no password required
+    const token = signToken({ sessionId: crypto.randomUUID(), tier: 'free', createdAt: Date.now() });
+    return res.json({ token, tier: 'free', used: 0, limit: FREE_SEARCH_LIMIT, remaining: FREE_SEARCH_LIMIT });
+  }
+  const { password } = req.body || {};
+  if (!password || password !== ACCESS_PASSWORD) {
+    return res.status(401).json({ error: 'Incorrect password' });
+  }
+  const sessionId = crypto.randomUUID();
+  const token = signToken({ sessionId, tier: 'free', createdAt: Date.now() });
+  res.json({ token, tier: 'free', used: 0, limit: FREE_SEARCH_LIMIT, remaining: FREE_SEARCH_LIMIT });
+});
+
+// ── GET /usage ────────────────────────────────────────────────────────────────
+app.get('/usage', requireAuth, (req, res) => {
+  if (!req.session) {
+    return res.json({ tier: 'free', used: 0, limit: FREE_SEARCH_LIMIT, remaining: FREE_SEARCH_LIMIT });
+  }
+  const { sessionId, tier } = req.session;
+  if (tier === 'pro') return res.json({ tier: 'pro', used: 0, limit: null, remaining: null });
+  const usage = getUsage(sessionId);
+  res.json({
+    tier: 'free',
+    used: usage.searches,
+    limit: FREE_SEARCH_LIMIT,
+    remaining: FREE_SEARCH_LIMIT - usage.searches,
+  });
+});
+
+// ── STRIPE ────────────────────────────────────────────────────────────────────
+let stripe = null;
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
+if (STRIPE_SECRET_KEY) {
+  try { stripe = require('stripe')(STRIPE_SECRET_KEY); }
+  catch(e) { console.warn('Stripe failed to load:', e.message); }
+}
+
+app.post('/create-checkout-session', requireAuth, async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: 'Payments not configured. Add STRIPE_SECRET_KEY and price IDs to Render env vars.' });
+  }
+  const PRICE_MAP = {
+    starter: process.env.STRIPE_PRICE_STARTER,
+    pro:     process.env.STRIPE_PRICE_PRO,
+    agency:  process.env.STRIPE_PRICE_AGENCY,
+  };
+  const { tier = 'starter' } = req.body || {};
+  const priceId = PRICE_MAP[tier];
+  if (!priceId) {
+    return res.status(503).json({ error: `Add STRIPE_PRICE_${tier.toUpperCase()} to Render env vars.` });
+  }
+  try {
+    const FRONTEND = process.env.FRONTEND_URL || 'https://astounding-bubblegum-cff1c5.netlify.app';
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      mode: 'subscription',
+      line_items: [{ price: priceId, quantity: 1 }],
+      success_url: `${FRONTEND}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${FRONTEND}?payment=cancelled`,
+      metadata: { sessionId: req.session?.sessionId },
+    });
+    res.json({ checkoutUrl: session.url });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/payment-success', requireAuth, async (req, res) => {
+  if (!stripe) return res.status(503).json({ error: 'Payments not configured' });
+  const { session_id } = req.query;
+  try {
+    const session = await stripe.checkout.sessions.retrieve(session_id);
+    if (session.payment_status !== 'paid') {
+      return res.status(402).json({ error: 'Payment not confirmed' });
+    }
+    const sessionId = req.session?.sessionId || crypto.randomUUID();
+    const token = signToken({
+      sessionId,
+      tier: 'pro',
+      createdAt: Date.now(),
+      expiresAt: Date.now() + 31 * 24 * 60 * 60 * 1000,
+    });
+    res.json({ token, tier: 'pro' });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── GET /search ───────────────────────────────────────────────────────────────
+app.get('/search', requireAuth, checkUsageLimit, searchLimiter, async (req, res) => {
   try {
     const { query } = req.query;
+    const cacheKey = (query || '').toLowerCase().trim();
+    const cached = getCached(cacheKey);
+    if (cached) return res.json(cached);
+
     const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(query)}&key=${PLACES_KEY}`;
     const response = await fetch(url);
     const data = await response.json();
+
+    // Increment usage only on live (non-cached) responses
+    if (req.session) {
+      const usage = getUsage(req.session.sessionId);
+      usage.searches++;
+    }
+
+    setCache(cacheKey, data);
     res.json(data);
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
 });
 
-// Rich Place Details
-app.get('/details', async (req, res) => {
+// ── GET /details ──────────────────────────────────────────────────────────────
+app.get('/details', requireAuth, async (req, res) => {
   try {
     const { place_id } = req.query;
     const fields = [
@@ -42,8 +263,8 @@ app.get('/details', async (req, res) => {
   }
 });
 
-// Get a Google Places photo URL
-app.get('/photo', async (req, res) => {
+// ── GET /photo ────────────────────────────────────────────────────────────────
+app.get('/photo', requireAuth, async (req, res) => {
   try {
     const { ref, maxwidth } = req.query;
     const w = maxwidth || 1200;
@@ -55,8 +276,8 @@ app.get('/photo', async (req, res) => {
   }
 });
 
-// Scrape existing website for logo, social media, email
-app.get('/scrape', async (req, res) => {
+// ── GET /scrape ───────────────────────────────────────────────────────────────
+app.get('/scrape', requireAuth, async (req, res) => {
   try {
     const { url } = req.query;
     if (!url) return res.json({ error: 'No URL provided' });
@@ -113,8 +334,8 @@ function resolveUrl(href, baseUrl) {
   try { return new URL(href, baseUrl).href; } catch { return null; }
 }
 
-// Generate logo using Ideogram API
-app.post('/generate-logo', async (req, res) => {
+// ── POST /generate-logo ───────────────────────────────────────────────────────
+app.post('/generate-logo', requireAuth, async (req, res) => {
   try {
     const { name, biztype } = req.body;
     const IDEOGRAM_KEY = process.env.IDEOGRAM_KEY;
@@ -124,18 +345,9 @@ app.post('/generate-logo', async (req, res) => {
 
     const response = await fetch('https://api.ideogram.ai/generate', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Api-Key': IDEOGRAM_KEY
-      },
+      headers: { 'Content-Type': 'application/json', 'Api-Key': IDEOGRAM_KEY },
       body: JSON.stringify({
-        image_request: {
-          prompt,
-          aspect_ratio: 'ASPECT_1_1',
-          model: 'V_2',
-          style_type: 'DESIGN',
-          magic_prompt_option: 'ON'
-        }
+        image_request: { prompt, aspect_ratio: 'ASPECT_1_1', model: 'V_2', style_type: 'DESIGN', magic_prompt_option: 'ON' }
       })
     });
 
@@ -148,14 +360,13 @@ app.post('/generate-logo', async (req, res) => {
   }
 });
 
-// Generate a single branding image via Ideogram
-app.post('/generate-image', async (req, res) => {
+// ── POST /generate-image ──────────────────────────────────────────────────────
+app.post('/generate-image', requireAuth, async (req, res) => {
   try {
     const { prompt, size = '1024x1024' } = req.body;
     const IDEOGRAM_KEY = process.env.IDEOGRAM_KEY;
     if (!IDEOGRAM_KEY) return res.status(500).json({ error: 'Ideogram API key not configured on server' });
 
-    // Map pixel dimensions to Ideogram aspect ratio tokens
     const aspectMap = {
       '1024x1024': 'ASPECT_1_1',
       '1792x1024': 'ASPECT_16_9',
@@ -165,18 +376,9 @@ app.post('/generate-image', async (req, res) => {
 
     const response = await fetch('https://api.ideogram.ai/generate', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Api-Key': IDEOGRAM_KEY
-      },
+      headers: { 'Content-Type': 'application/json', 'Api-Key': IDEOGRAM_KEY },
       body: JSON.stringify({
-        image_request: {
-          prompt,
-          aspect_ratio,
-          model: 'V_2',
-          style_type: 'DESIGN',
-          magic_prompt_option: 'ON'
-        }
+        image_request: { prompt, aspect_ratio, model: 'V_2', style_type: 'DESIGN', magic_prompt_option: 'ON' }
       })
     });
 
@@ -189,17 +391,20 @@ app.post('/generate-image', async (req, res) => {
   }
 });
 
-// Debug
+// ── GET /debug ────────────────────────────────────────────────────────────────
 app.get('/debug', (req, res) => {
   res.json({
     has_anthropic_key: !!ANTHROPIC_KEY,
     key_preview: ANTHROPIC_KEY ? ANTHROPIC_KEY.substring(0, 10) + '...' : 'NOT SET',
-    has_places_key: !!PLACES_KEY
+    has_places_key: !!PLACES_KEY,
+    auth_enabled: !!ACCESS_PASSWORD,
+    stripe_enabled: !!stripe,
+    cached_queries: searchCache.size,
   });
 });
 
-// Generate website / branding kit — streams response as SSE to prevent timeout
-app.post('/generate', async (req, res) => {
+// ── POST /generate ────────────────────────────────────────────────────────────
+app.post('/generate', requireAuth, async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not set' });

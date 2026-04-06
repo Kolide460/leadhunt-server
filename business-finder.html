@@ -410,6 +410,50 @@ iframe{width:100%;height:480px;border:none;background:#fff;}
   <div class="header-tag">⚡ AI-Powered</div>
 </header>
 
+<!-- AUTH GATE -->
+<div id="authGate" style="display:none;position:fixed;inset:0;background:rgba(10,10,15,0.97);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(6px);">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:44px 40px;width:100%;max-width:400px;text-align:center;">
+    <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:6px;">Lead<span style="color:var(--accent)">Hunt</span></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:28px;font-family:'DM Mono',monospace;letter-spacing:0.06em;">ENTER YOUR ACCESS PASSWORD</div>
+    <input type="password" id="authPwInput" placeholder="Password" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px 16px;font-size:15px;color:var(--text);outline:none;margin-bottom:10px;font-family:'DM Sans',sans-serif;box-sizing:border-box;"/>
+    <div id="authError" style="color:var(--danger);font-size:13px;margin-bottom:10px;min-height:18px;font-family:'DM Mono',monospace;"></div>
+    <button id="authSubmitBtn" onclick="submitPassword()" style="width:100%;background:var(--accent);color:#000;border:none;padding:13px;border-radius:6px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:0.02em;">Enter</button>
+  </div>
+</div>
+
+<!-- PAYWALL MODAL -->
+<div id="paywallModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:400;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:20px;">
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:40px;width:100%;max-width:600px;position:relative;">
+    <button onclick="closePaywall()" style="position:absolute;top:16px;right:16px;background:none;border:1px solid var(--border);color:var(--muted);width:32px;height:32px;border-radius:5px;cursor:pointer;font-size:16px;line-height:1;">✕</button>
+    <div style="text-align:center;margin-bottom:32px;">
+      <div style="font-size:40px;margin-bottom:12px;">🔒</div>
+      <h2 style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:8px;">Free Limit Reached</h2>
+      <p style="color:var(--muted);font-size:14px;line-height:1.6;">You've used all 10 free searches. Upgrade to keep finding leads and generating websites.</p>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:22px 16px;text-align:center;">
+        <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;margin-bottom:8px;color:var(--muted);letter-spacing:0.05em;text-transform:uppercase;">Starter</div>
+        <div style="font-size:30px;font-weight:800;font-family:'Syne',sans-serif;margin-bottom:4px;">£29<span style="font-size:13px;font-weight:400;color:var(--muted);">/mo</span></div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.7;">Unlimited searches<br>Website generation<br>Branding packages</div>
+        <button id="upgradeBtn_starter" onclick="startCheckout('starter')" style="width:100%;background:var(--accent);color:#000;border:none;padding:10px;border-radius:5px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">Upgrade</button>
+      </div>
+      <div style="background:var(--surface2);border:2px solid var(--accent);border-radius:8px;padding:22px 16px;text-align:center;position:relative;">
+        <div style="position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--accent);color:#000;font-size:10px;font-weight:800;font-family:'Syne',sans-serif;padding:3px 12px;border-radius:20px;white-space:nowrap;letter-spacing:0.06em;">MOST POPULAR</div>
+        <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;margin-bottom:8px;color:var(--muted);letter-spacing:0.05em;text-transform:uppercase;">Pro</div>
+        <div style="font-size:30px;font-weight:800;font-family:'Syne',sans-serif;margin-bottom:4px;">£79<span style="font-size:13px;font-weight:400;color:var(--muted);">/mo</span></div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.7;">Everything in Starter<br>Priority support<br>Multi-location search</div>
+        <button id="upgradeBtn_pro" onclick="startCheckout('pro')" style="width:100%;background:var(--accent);color:#000;border:none;padding:10px;border-radius:5px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">Upgrade</button>
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:22px 16px;text-align:center;">
+        <div style="font-family:'Syne',sans-serif;font-size:13px;font-weight:700;margin-bottom:8px;color:var(--muted);letter-spacing:0.05em;text-transform:uppercase;">Agency</div>
+        <div style="font-size:30px;font-weight:800;font-family:'Syne',sans-serif;margin-bottom:4px;">£199<span style="font-size:13px;font-weight:400;color:var(--muted);">/mo</span></div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.7;">Everything in Pro<br>Team access (5 seats)<br>White-label reports</div>
+        <button id="upgradeBtn_agency" onclick="startCheckout('agency')" style="width:100%;background:var(--accent2);color:#fff;border:none;padding:10px;border-radius:5px;font-family:'Syne',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">Upgrade</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <main>
   <!-- SIDEBAR -->
   <aside class="sidebar">
@@ -463,6 +507,16 @@ iframe{width:100%;height:480px;border:none;background:#fff;}
     <div class="stat-row">
       <div class="stat-box"><div class="n" id="statTotal">0</div><div class="l">Total Found</div></div>
       <div class="stat-box"><div class="n" id="statLeads">0</div><div class="l">No Website</div></div>
+    </div>
+
+    <div id="usageWrap" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span style="font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;" id="usageLabel">0 / 10 free searches used</span>
+        <button onclick="showPaywall()" style="font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;font-family:'DM Mono',monospace;padding:0;">Upgrade ↗</button>
+      </div>
+      <div id="usageBar" style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;">
+        <div id="usageBarFill" style="height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width 0.3s;"></div>
+      </div>
     </div>
 
     <div class="info-box">
@@ -572,6 +626,165 @@ let currentHTML = '';
 let currentBiz = null;
 let allResults = [];
 
+// ── AUTH & TOKEN MANAGEMENT ──────────────────────────────────────────────────
+let authToken = localStorage.getItem('lh_token');
+
+// Wrapper: adds X-Auth-Token header to all API requests
+function apiFetch(url, opts = {}) {
+  if (authToken) {
+    opts = { ...opts, headers: { ...(opts.headers || {}), 'X-Auth-Token': authToken } };
+  }
+  return fetch(url, opts);
+}
+
+function showAuthGate() {
+  const gate = document.getElementById('authGate');
+  gate.style.display = 'flex';
+  setTimeout(() => document.getElementById('authPwInput')?.focus(), 50);
+}
+function hideAuthGate() {
+  document.getElementById('authGate').style.display = 'none';
+}
+function showPaywall() {
+  document.getElementById('paywallModal').style.display = 'flex';
+}
+function closePaywall() {
+  document.getElementById('paywallModal').style.display = 'none';
+}
+
+function updateUsageUI(data) {
+  const wrap = document.getElementById('usageWrap');
+  const label = document.getElementById('usageLabel');
+  const barFill = document.getElementById('usageBarFill');
+  const bar = document.getElementById('usageBar');
+  if (!wrap) return;
+  wrap.style.display = 'block';
+  if (data.tier === 'pro') {
+    label.innerHTML = '<span style="color:var(--accent)">✦ Pro — unlimited searches</span>';
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = 'block';
+  const used = data.used || 0;
+  const limit = data.limit || 10;
+  const pct = Math.min(100, (used / limit) * 100);
+  label.textContent = `${used} / ${limit} free searches used`;
+  barFill.style.width = pct + '%';
+  barFill.style.background = pct >= 80 ? 'var(--warning)' : 'var(--accent)';
+}
+
+async function refreshUsage() {
+  if (!authToken) return;
+  try {
+    const res = await apiFetch(`${API_BASE}/usage`, { headers: { 'X-Auth-Token': authToken } });
+    if (res.ok) updateUsageUI(await res.json());
+  } catch(e) { /* non-critical */ }
+}
+
+async function submitPassword() {
+  const pw = document.getElementById('authPwInput').value;
+  const btn = document.getElementById('authSubmitBtn');
+  const err = document.getElementById('authError');
+  btn.disabled = true;
+  btn.textContent = 'Verifying...';
+  err.textContent = '';
+  try {
+    const res = await apiFetch(`${API_BASE}/auth`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw })
+    });
+    const data = await res.json();
+    if (!res.ok) { err.textContent = data.error || 'Incorrect password'; return; }
+    authToken = data.token;
+    localStorage.setItem('lh_token', authToken);
+    updateUsageUI(data);
+    hideAuthGate();
+  } catch(e) {
+    err.textContent = 'Connection error — is the server running?';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Enter';
+  }
+}
+
+async function startCheckout(tier) {
+  const btn = document.getElementById(`upgradeBtn_${tier}`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading...'; }
+  try {
+    const res = await apiFetch(`${API_BASE}/create-checkout-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tier })
+    });
+    const data = await res.json();
+    if (data.checkoutUrl) {
+      window.location.href = data.checkoutUrl;
+    } else {
+      alert(data.error || 'Payments not yet configured.');
+      if (btn) { btn.disabled = false; btn.textContent = 'Upgrade'; }
+    }
+  } catch(e) {
+    alert('Error: ' + e.message);
+    if (btn) { btn.disabled = false; btn.textContent = 'Upgrade'; }
+  }
+}
+
+async function handlePaymentSuccess(sessionId) {
+  try {
+    const res = await apiFetch(`${API_BASE}/payment-success?session_id=${sessionId}`, {
+      headers: { 'X-Auth-Token': authToken }
+    });
+    const data = await res.json();
+    if (data.token) {
+      authToken = data.token;
+      localStorage.setItem('lh_token', authToken);
+    }
+    updateUsageUI({ tier: 'pro' });
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;top:20px;right:20px;background:var(--accent);color:#000;padding:14px 20px;border-radius:8px;font-family:Syne,sans-serif;font-weight:700;font-size:14px;z-index:9999;box-shadow:0 4px 20px rgba(0,229,160,0.3);';
+    toast.textContent = '✦ Upgraded to Pro — unlimited searches!';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 5000);
+  } catch(e) { /* non-critical */ }
+}
+
+async function initAuth() {
+  // Handle payment return
+  const params = new URLSearchParams(location.search);
+  if (params.get('payment') === 'success') {
+    const sessionId = params.get('session_id');
+    history.replaceState({}, '', location.pathname);
+    await handlePaymentSuccess(sessionId);
+    return;
+  }
+  if (params.get('payment') === 'cancelled') {
+    history.replaceState({}, '', location.pathname);
+  }
+
+  if (!authToken) { showAuthGate(); return; }
+
+  // Verify existing token against server
+  try {
+    const res = await apiFetch(`${API_BASE}/usage`, { headers: { 'X-Auth-Token': authToken } });
+    if (res.status === 401) {
+      authToken = null;
+      localStorage.removeItem('lh_token');
+      showAuthGate();
+      return;
+    }
+    if (res.ok) updateUsageUI(await res.json());
+  } catch(e) {
+    // Server unreachable (cold start etc.) — allow through
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const inp = document.getElementById('authPwInput');
+  if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') submitPassword(); });
+  initAuth();
+});
+
 // ── TEST FIXTURE ────────────────────────────────────────────────────────────
 const TEST_BUSINESS = {
   name: 'Wingshed Truro',
@@ -629,7 +842,9 @@ async function runSearch() {
 
   try {
     const query = `${biztype} in ${location}`;
-    const res = await fetch(`${API_BASE}/search?query=${encodeURIComponent(query)}`);
+    const res = await apiFetch(`${API_BASE}/search?query=${encodeURIComponent(query)}`);
+    if (res.status === 401) { authToken = null; localStorage.removeItem('lh_token'); showAuthGate(); return; }
+    if (res.status === 402) { showPaywall(); return; }
     const parsed = await res.json();
 
     if (parsed.status === 'REQUEST_DENIED') {
@@ -656,6 +871,7 @@ async function runSearch() {
 
     const toShow = filter === 'no_website' ? noWebsite : leads;
     renderResults(toShow, filter === 'no_website', biztype, location);
+    refreshUsage();
 
   } catch(e) {
     showError(`Search failed: ${e.message}<br><br>Make sure your Render server is running and the URL in the file is correct.`);
@@ -666,7 +882,7 @@ async function runSearch() {
 
 async function getPlaceDetails(placeId) {
   try {
-    const res = await fetch(`${API_BASE}/details?place_id=${placeId}`);
+    const res = await apiFetch(`${API_BASE}/details?place_id=${placeId}`);
     const parsed = await res.json();
     return parsed.result || null;
   } catch { return null; }
@@ -745,7 +961,7 @@ async function generateWebsite(biz, biztype, options = null) {
     // Legacy path: fetch everything now (used by test fixture / direct calls)
     if (biz.place_id && !biz.place_id.startsWith('TEST_')) {
       try {
-        const detailRes = await fetch(`${API_BASE}/details?place_id=${biz.place_id || ''}`);
+        const detailRes = await apiFetch(`${API_BASE}/details?place_id=${biz.place_id || ''}`);
         const detailJson = await detailRes.json();
         if (detailJson.result) richData = { ...biz, ...detailJson.result };
       } catch(e) {}
@@ -755,7 +971,7 @@ async function generateWebsite(biz, biztype, options = null) {
     if (richData.photos && richData.photos.length > 0) {
       for (const p of richData.photos.slice(0, 3)) {
         try {
-          const pr = await fetch(`${API_BASE}/photo?ref=${p.photo_reference}&maxwidth=1200`);
+          const pr = await apiFetch(`${API_BASE}/photo?ref=${p.photo_reference}&maxwidth=1200`);
           const pj = await pr.json();
           if (pj.photo_url) photoUrls.push(pj.photo_url);
         } catch(e) {}
@@ -765,7 +981,7 @@ async function generateWebsite(biz, biztype, options = null) {
     if (richData.website) {
       document.querySelector('.modal-loading p').textContent = 'Scanning existing web presence...';
       try {
-        const scrapeRes = await fetch(`${API_BASE}/scrape?url=${encodeURIComponent(richData.website)}`);
+        const scrapeRes = await apiFetch(`${API_BASE}/scrape?url=${encodeURIComponent(richData.website)}`);
         scraped = await scrapeRes.json();
       } catch(e) {}
     }
@@ -773,7 +989,7 @@ async function generateWebsite(biz, biztype, options = null) {
     document.querySelector('.modal-loading p').textContent = 'Designing logo...';
     if (!scraped.logo) {
       try {
-        const logoRes = await fetch(`${API_BASE}/generate-logo`, {
+        const logoRes = await apiFetch(`${API_BASE}/generate-logo`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: richData.name, biztype })
@@ -870,7 +1086,7 @@ REQUIREMENTS:
 - Output ONLY raw HTML starting with <!DOCTYPE html>, no markdown, no explanation`;
 
   try {
-    const response = await fetch(`${API_BASE}/generate`, {
+    const response = await apiFetch(`${API_BASE}/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt })
@@ -1032,7 +1248,7 @@ async function generateBranding(biz, biztype) {
 
   await Promise.all(imgDefs.map(async ({ token, size, prompt: imgPrompt }) => {
     try {
-      const r = await fetch(`${API_BASE}/generate-image`, {
+      const r = await apiFetch(`${API_BASE}/generate-image`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: imgPrompt, size })
@@ -1123,7 +1339,7 @@ background:#f5f5f5. Each section: full-width dark label bar (monospace white tex
 Output ONLY raw HTML starting with <!DOCTYPE html>.`;
 
   try {
-    const response = await fetch(`${API_BASE}/generate`, {
+    const response = await apiFetch(`${API_BASE}/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ prompt })
@@ -1450,7 +1666,7 @@ async function openControlScreen(biz, biztype) {
   // Step 1: rich details
   if (biz.place_id && !biz.place_id.startsWith('TEST_')) {
     try {
-      const r = await fetch(`${API_BASE}/details?place_id=${biz.place_id}`);
+      const r = await apiFetch(`${API_BASE}/details?place_id=${biz.place_id}`);
       const j = await r.json();
       if (j.result) richData = { ...biz, ...j.result };
     } catch(e) {}
@@ -1463,7 +1679,7 @@ async function openControlScreen(biz, biztype) {
     const results = await Promise.all(
       richData.photos.slice(0, 10).map(async p => {
         try {
-          const r = await fetch(`${API_BASE}/photo?ref=${p.photo_reference}&maxwidth=800`);
+          const r = await apiFetch(`${API_BASE}/photo?ref=${p.photo_reference}&maxwidth=800`);
           const j = await r.json();
           return j.photo_url || null;
         } catch { return null; }
@@ -1477,7 +1693,7 @@ async function openControlScreen(biz, biztype) {
   // Step 3: scrape
   if (richData.website) {
     try {
-      const r = await fetch(`${API_BASE}/scrape?url=${encodeURIComponent(richData.website)}`);
+      const r = await apiFetch(`${API_BASE}/scrape?url=${encodeURIComponent(richData.website)}`);
       scraped = await r.json();
     } catch(e) {}
   }
@@ -1749,7 +1965,7 @@ async function generateLogo() {
   logoSection.innerHTML = `<div class="logo-none-box"><div class="spinner" style="width:24px;height:24px;border-width:2px;"></div><p style="margin-left:4px;">Generating logo with Ideogram...</p></div>`;
 
   try {
-    const r = await fetch(`${API_BASE}/generate-logo`, {
+    const r = await apiFetch(`${API_BASE}/generate-logo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: richData.name, biztype })
@@ -1898,7 +2114,7 @@ async function regenerateEditorLogo(btn) {
   btn.disabled = true;
   btn.textContent = 'Generating…';
   try {
-    const r = await fetch(`${API_BASE}/generate-logo`, {
+    const r = await apiFetch(`${API_BASE}/generate-logo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: currentBiz.name, biztype: controlBiztype || 'business' })
