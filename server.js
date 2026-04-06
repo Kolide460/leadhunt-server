@@ -24,6 +24,7 @@ try { helmet = require('helmet'); } catch(e) { helmet = null; }
 if (helmet) app.use(helmet());
 
 const ALLOWED_ORIGINS = [
+  'https://leadhunts.netlify.app',
   'https://astounding-bubblegum-cff1c5.netlify.app',
   'http://localhost:3000',
   'http://localhost:5500',
@@ -183,7 +184,7 @@ app.post('/create-checkout-session', requireAuth, async (req, res) => {
     return res.status(503).json({ error: `Add STRIPE_PRICE_${tier.toUpperCase()} to Render env vars.` });
   }
   try {
-    const FRONTEND = process.env.FRONTEND_URL || 'https://astounding-bubblegum-cff1c5.netlify.app';
+    const FRONTEND = process.env.FRONTEND_URL || 'https://leadhunts.netlify.app';
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'subscription',
