@@ -407,17 +407,29 @@ iframe{width:100%;height:480px;border:none;background:#fff;}
     Lead<span>Hunt</span>
     <small>BY KJBTRADING — BUSINESS WEBSITE FINDER</small>
   </div>
-  <div class="header-tag">⚡ AI-Powered</div>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div class="header-tag">⚡ AI-Powered</div>
+    <button id="logoutBtn" onclick="logout()" style="display:none;font-size:11px;color:var(--muted);background:none;border:1px solid var(--border);padding:4px 12px;border-radius:20px;cursor:pointer;font-family:'DM Mono',monospace;letter-spacing:0.04em;">Sign out</button>
+  </div>
 </header>
 
 <!-- AUTH GATE -->
 <div id="authGate" style="display:none;position:fixed;inset:0;background:rgba(10,10,15,0.97);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(6px);">
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:44px 40px;width:100%;max-width:400px;text-align:center;">
     <div style="font-family:'Syne',sans-serif;font-size:26px;font-weight:800;margin-bottom:6px;">Lead<span style="color:var(--accent)">Hunt</span></div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:28px;font-family:'DM Mono',monospace;letter-spacing:0.06em;">ENTER YOUR ACCESS PASSWORD</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:24px;font-family:'DM Mono',monospace;letter-spacing:0.06em;" id="authSubtitle">SIGN IN TO YOUR ACCOUNT</div>
+    <div style="display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:4px;margin-bottom:24px;gap:4px;">
+      <button id="loginTabBtn" onclick="switchAuthMode('login')" style="flex:1;padding:8px;border:none;border-radius:5px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;background:var(--accent);color:#000;letter-spacing:0.04em;">LOG IN</button>
+      <button id="registerTabBtn" onclick="switchAuthMode('register')" style="flex:1;padding:8px;border:none;border-radius:5px;font-family:'Syne',sans-serif;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--muted);letter-spacing:0.04em;">REGISTER</button>
+    </div>
+    <input type="email" id="authEmailInput" placeholder="Email address" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px 16px;font-size:15px;color:var(--text);outline:none;margin-bottom:10px;font-family:'DM Sans',sans-serif;box-sizing:border-box;"/>
     <input type="password" id="authPwInput" placeholder="Password" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px 16px;font-size:15px;color:var(--text);outline:none;margin-bottom:10px;font-family:'DM Sans',sans-serif;box-sizing:border-box;"/>
+    <div id="authConfirmWrap" style="display:none;">
+      <input type="password" id="authConfirmPwInput" placeholder="Confirm password" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:12px 16px;font-size:15px;color:var(--text);outline:none;margin-bottom:10px;font-family:'DM Sans',sans-serif;box-sizing:border-box;"/>
+    </div>
     <div id="authError" style="color:var(--danger);font-size:13px;margin-bottom:10px;min-height:18px;font-family:'DM Mono',monospace;"></div>
-    <button id="authSubmitBtn" onclick="submitPassword()" style="width:100%;background:var(--accent);color:#000;border:none;padding:13px;border-radius:6px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:0.02em;">Enter</button>
+    <button id="authSubmitBtn" onclick="submitAuth()" style="width:100%;background:var(--accent);color:#000;border:none;padding:13px;border-radius:6px;font-family:'Syne',sans-serif;font-size:14px;font-weight:700;cursor:pointer;letter-spacing:0.02em;">Log in</button>
+    <p style="margin-top:16px;font-size:12px;color:var(--muted);font-family:'DM Mono',monospace;">2 free searches included. No card required.</p>
   </div>
 </div>
 
@@ -428,7 +440,7 @@ iframe{width:100%;height:480px;border:none;background:#fff;}
     <div style="text-align:center;margin-bottom:32px;">
       <div style="font-size:40px;margin-bottom:12px;">🔒</div>
       <h2 style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:8px;">Free Limit Reached</h2>
-      <p style="color:var(--muted);font-size:14px;line-height:1.6;">You've used all 10 free searches. Upgrade to keep finding leads and generating websites.</p>
+      <p style="color:var(--muted);font-size:14px;line-height:1.6;">You've used all 2 free searches. Upgrade to keep finding leads and generating websites.</p>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:22px 16px;text-align:center;">
@@ -659,14 +671,15 @@ function updateUsageUI(data) {
   const bar = document.getElementById('usageBar');
   if (!wrap) return;
   wrap.style.display = 'block';
-  if (data.tier === 'pro') {
-    label.innerHTML = '<span style="color:var(--accent)">✦ Pro — unlimited searches</span>';
+  const tierLabels = { starter: 'Starter', pro: 'Pro', agency: 'Agency' };
+  if (data.tier && data.tier !== 'free') {
+    label.innerHTML = `<span style="color:var(--accent)">✦ ${tierLabels[data.tier] || data.tier} — unlimited searches</span>`;
     bar.style.display = 'none';
     return;
   }
   bar.style.display = 'block';
   const used = data.used || 0;
-  const limit = data.limit || 10;
+  const limit = data.limit || 2;
   const pct = Math.min(100, (used / limit) * 100);
   label.textContent = `${used} / ${limit} free searches used`;
   barFill.style.width = pct + '%';
@@ -681,31 +694,63 @@ async function refreshUsage() {
   } catch(e) { /* non-critical */ }
 }
 
-async function submitPassword() {
+let authMode = 'login';
+
+function switchAuthMode(mode) {
+  authMode = mode;
+  const isLogin = mode === 'login';
+  document.getElementById('authConfirmWrap').style.display = isLogin ? 'none' : 'block';
+  document.getElementById('authSubmitBtn').textContent = isLogin ? 'Log in' : 'Create account';
+  document.getElementById('authSubtitle').textContent = isLogin ? 'SIGN IN TO YOUR ACCOUNT' : 'CREATE A FREE ACCOUNT';
+  document.getElementById('loginTabBtn').style.background = isLogin ? 'var(--accent)' : 'transparent';
+  document.getElementById('loginTabBtn').style.color = isLogin ? '#000' : 'var(--muted)';
+  document.getElementById('registerTabBtn').style.background = isLogin ? 'transparent' : 'var(--accent)';
+  document.getElementById('registerTabBtn').style.color = isLogin ? 'var(--muted)' : '#000';
+  document.getElementById('authError').textContent = '';
+}
+
+async function submitAuth() {
+  const email = document.getElementById('authEmailInput').value.trim();
   const pw = document.getElementById('authPwInput').value;
   const btn = document.getElementById('authSubmitBtn');
   const err = document.getElementById('authError');
+  if (!email || !pw) { err.textContent = 'Please fill in all fields.'; return; }
+  if (authMode === 'register') {
+    const confirmPw = document.getElementById('authConfirmPwInput').value;
+    if (pw !== confirmPw) { err.textContent = 'Passwords do not match.'; return; }
+    if (pw.length < 8) { err.textContent = 'Password must be at least 8 characters.'; return; }
+  }
   btn.disabled = true;
-  btn.textContent = 'Verifying...';
+  btn.textContent = authMode === 'login' ? 'Logging in...' : 'Creating account...';
   err.textContent = '';
   try {
-    const res = await apiFetch(`${API_BASE}/auth`, {
+    const endpoint = authMode === 'login' ? '/auth' : '/register';
+    const res = await fetch(`${API_BASE}${endpoint}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ password: pw })
+      body: JSON.stringify({ email, password: pw })
     });
     const data = await res.json();
-    if (!res.ok) { err.textContent = data.error || 'Incorrect password'; return; }
+    if (!res.ok) { err.textContent = data.error || 'Something went wrong.'; return; }
     authToken = data.token;
     localStorage.setItem('lh_token', authToken);
     updateUsageUI(data);
     hideAuthGate();
+    document.getElementById('logoutBtn').style.display = 'block';
   } catch(e) {
     err.textContent = 'Connection error — is the server running?';
   } finally {
     btn.disabled = false;
-    btn.textContent = 'Enter';
+    btn.textContent = authMode === 'login' ? 'Log in' : 'Create account';
   }
+}
+
+function logout() {
+  authToken = null;
+  localStorage.removeItem('lh_token');
+  document.getElementById('logoutBtn').style.display = 'none';
+  document.getElementById('usageWrap').style.display = 'none';
+  showAuthGate();
 }
 
 async function startCheckout(tier) {
@@ -732,57 +777,31 @@ async function startCheckout(tier) {
 
 async function handlePaymentSuccess(sessionId) {
   try {
-    const res = await apiFetch(`${API_BASE}/payment-success?session_id=${sessionId}`, {
-      headers: { 'X-Auth-Token': authToken }
-    });
+    const res = await apiFetch(`${API_BASE}/payment-success?session_id=${sessionId}`);
     const data = await res.json();
-    if (data.token) {
-      authToken = data.token;
-      localStorage.setItem('lh_token', authToken);
-    }
-    updateUsageUI({ tier: 'pro' });
+    if (res.ok) await refreshUsage();
+    const tierLabels = { starter: 'Starter', pro: 'Pro', agency: 'Agency' };
+    const tierName = tierLabels[data.tier] || 'Pro';
     const toast = document.createElement('div');
     toast.style.cssText = 'position:fixed;top:20px;right:20px;background:var(--accent);color:#000;padding:14px 20px;border-radius:8px;font-family:Syne,sans-serif;font-weight:700;font-size:14px;z-index:9999;box-shadow:0 4px 20px rgba(0,229,160,0.3);';
-    toast.textContent = '✦ Upgraded to Pro — unlimited searches!';
+    toast.textContent = `✦ ${tierName} activated — unlimited searches!`;
     document.body.appendChild(toast);
     setTimeout(() => toast.remove(), 5000);
   } catch(e) { /* non-critical */ }
 }
 
 async function initAuth() {
-  // Handle payment return
   const params = new URLSearchParams(location.search);
-  if (params.get('payment') === 'success') {
-    const sessionId = params.get('session_id');
-    history.replaceState({}, '', location.pathname);
-    await handlePaymentSuccess(sessionId);
-    return;
-  }
   if (params.get('payment') === 'cancelled') {
     history.replaceState({}, '', location.pathname);
   }
 
   if (!authToken) {
-    // Try silent auto-login — works when ACCESS_PASSWORD is not set on server
-    try {
-      const res = await fetch(`${API_BASE}/auth`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: '' })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        authToken = data.token;
-        localStorage.setItem('lh_token', authToken);
-        updateUsageUI(data);
-        return;
-      }
-    } catch(e) { /* fall through */ }
     showAuthGate();
     return;
   }
 
-  // Verify existing token against server
+  // Verify existing token and load usage from server
   try {
     const res = await fetch(`${API_BASE}/usage`, { headers: { 'X-Auth-Token': authToken } });
     if (res.status === 401) {
@@ -791,15 +810,29 @@ async function initAuth() {
       showAuthGate();
       return;
     }
-    if (res.ok) updateUsageUI(await res.json());
+    if (res.ok) {
+      updateUsageUI(await res.json());
+      document.getElementById('logoutBtn').style.display = 'block';
+    }
   } catch(e) {
     // Server unreachable (cold start etc.) — allow through
+  }
+
+  // Handle payment return after token is verified
+  if (params.get('payment') === 'success') {
+    const sessionId = params.get('session_id');
+    history.replaceState({}, '', location.pathname);
+    await handlePaymentSuccess(sessionId);
   }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const inp = document.getElementById('authPwInput');
-  if (inp) inp.addEventListener('keydown', e => { if (e.key === 'Enter') submitPassword(); });
+  const pwInp = document.getElementById('authPwInput');
+  const emailInp = document.getElementById('authEmailInput');
+  const confirmInp = document.getElementById('authConfirmPwInput');
+  if (pwInp) pwInp.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
+  if (emailInp) emailInp.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
+  if (confirmInp) confirmInp.addEventListener('keydown', e => { if (e.key === 'Enter') submitAuth(); });
   initAuth();
 });
 

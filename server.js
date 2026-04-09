@@ -1,14 +1,22 @@
 const express = require('express');
 const cors = require('cors');
 const crypto = require('crypto');
+const path = require('path');
+const bcrypt = require('bcryptjs');
 const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const PLACES_KEY = process.env.PLACES_KEY;
 const ANTHROPIC_KEY = process.env.ANTHROPIC_KEY;
-const ACCESS_PASSWORD = process.env.ACCESS_PASSWORD;
-const FREE_SEARCH_LIMIT = 10;
+const TIER_LIMITS = {
+  free:    { searches: 4,   websites: 2   },
+  basic:   { searches: 30,  websites: 15  },
+  starter: { searches: 30,  websites: 15  }, // legacy alias for basic
+  pro:     { searches: 200, websites: 100 },
+  agency:  { searches: 200, websites: 100 }, // legacy alias for pro
+};
+const MONTH_MS = 30 * 24 * 60 * 60 * 1000;
 
 // TOKEN_SECRET — must be set in prod or all sessions reset on restart
 const TOKEN_SECRET = process.env.TOKEN_SECRET || (() => {
@@ -17,6 +25,47 @@ const TOKEN_SECRET = process.env.TOKEN_SECRET || (() => {
   }
   return crypto.randomBytes(32).toString('hex');
 })();
+
+// ── DATABASE ──────────────────────────────────────────────────────────────────
+let db;
+try {
+  const Database = require('better-sqlite3');
+  const DB_PATH = process.env.DB_PATH || path.join(__dirname, 'leadhunt.db');
+  db = new Database(DB_PATH);
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL COLLATE NOCASE,
+      password_hash TEXT NOT NULL,
+      tier TEXT NOT NULL DEFAULT 'free',
+      stripe_customer_id TEXT,
+      stripe_subscription_id TEXT,
+      subscription_status TEXT,
+      searches_used INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    )
+  `);
+  // Migrate: add usage columns for existing databases
+  try { db.exec(`ALTER TABLE users ADD COLUMN websites_used INTEGER NOT NULL DEFAULT 0`); } catch(_) {}
+  try { db.exec(`ALTER TABLE users ADD COLUMN usage_period_start INTEGER NOT NULL DEFAULT 0`); } catch(_) {}
+  console.log('[DB] SQLite initialized:', DB_PATH);
+} catch(e) {
+  console.error('[DB] Failed to initialize database:', e.message);
+  process.exit(1);
+}
+
+const stmts = {
+  getUser:             db.prepare('SELECT * FROM users WHERE id = ?'),
+  getUserByEmail:      db.prepare('SELECT * FROM users WHERE email = ? COLLATE NOCASE'),
+  getUserBySub:        db.prepare('SELECT * FROM users WHERE stripe_subscription_id = ?'),
+  insertUser:          db.prepare('INSERT INTO users (id, email, password_hash, tier, searches_used, websites_used, usage_period_start, created_at, updated_at) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?)'),
+  incrementSearches:   db.prepare('UPDATE users SET searches_used = searches_used + 1, updated_at = ? WHERE id = ?'),
+  incrementWebsites:   db.prepare('UPDATE users SET websites_used = websites_used + 1, updated_at = ? WHERE id = ?'),
+  resetUsage:          db.prepare('UPDATE users SET searches_used = 0, websites_used = 0, usage_period_start = ?, updated_at = ? WHERE id = ?'),
+  updateTier:          db.prepare('UPDATE users SET tier = ?, stripe_customer_id = ?, stripe_subscription_id = ?, subscription_status = ?, updated_at = ? WHERE id = ?'),
+  updateSubStatus:     db.prepare('UPDATE users SET subscription_status = ?, tier = ?, updated_at = ? WHERE stripe_subscription_id = ?'),
+};
 
 // ── SECURITY ─────────────────────────────────────────────────────────────────
 let helmet;
@@ -38,9 +87,11 @@ app.use(cors({
     cb(new Error('Not allowed by CORS'));
   },
   methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type', 'X-Auth-Token'],
+  allowedHeaders: ['Content-Type', 'X-Auth-Token', 'stripe-signature'],
 }));
 
+// Raw body needed for Stripe webhook signature verification
+app.use('/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: '2mb' }));
 
 // Rate limiting
@@ -53,7 +104,7 @@ const makeLimit = (windowMs, max) => rateLimit
 
 const generalLimiter = makeLimit(15 * 60 * 1000, 200); // 200 req / 15 min
 const searchLimiter  = makeLimit(60 * 1000, 20);        // 20 req / min
-const authLimiter    = makeLimit(60 * 1000, 10);        // 10 login attempts / min
+const authLimiter    = makeLimit(15 * 60 * 1000, 20);   // 20 attempts / 15 min
 
 app.use(generalLimiter);
 
@@ -79,14 +130,6 @@ function verifyToken(token) {
   } catch { return null; }
 }
 
-// ── IN-MEMORY USAGE TRACKING ──────────────────────────────────────────────────
-const usageMap = new Map(); // sessionId → { searches: number }
-
-function getUsage(sessionId) {
-  if (!usageMap.has(sessionId)) usageMap.set(sessionId, { searches: 0 });
-  return usageMap.get(sessionId);
-}
-
 // ── IN-MEMORY SEARCH CACHE ────────────────────────────────────────────────────
 const searchCache = new Map();
 const CACHE_TTL = 60 * 60 * 1000; // 1 hour
@@ -105,59 +148,115 @@ function setCache(key, data) {
 
 // ── AUTH MIDDLEWARE ───────────────────────────────────────────────────────────
 function requireAuth(req, res, next) {
-  if (!ACCESS_PASSWORD) return next(); // auth disabled if no password set
   const token = req.headers['x-auth-token'];
   const payload = verifyToken(token);
-  if (!payload) return res.status(401).json({ error: 'Not authenticated. Please log in.' });
-  req.session = payload;
+  if (!payload?.userId) return res.status(401).json({ error: 'Not authenticated. Please log in.' });
+  const user = stmts.getUser.get(payload.userId);
+  if (!user) return res.status(401).json({ error: 'Account not found. Please log in again.' });
+  req.user = user;
   next();
 }
 
-function checkUsageLimit(req, res, next) {
-  if (!req.session) return next();
-  const { sessionId, tier } = req.session;
-  if (tier === 'pro') return next();
-  const usage = getUsage(sessionId);
-  if (usage.searches >= FREE_SEARCH_LIMIT) {
-    return res.status(402).json({
-      error: 'Free search limit reached',
-      upgrade: true,
-      used: usage.searches,
-      limit: FREE_SEARCH_LIMIT,
-    });
-  }
-  next();
+function checkUsageLimit(type) {
+  return (req, res, next) => {
+    const { tier, usage_period_start } = req.user;
+    const limits = TIER_LIMITS[tier] || TIER_LIMITS.free;
+
+    // Reset monthly usage if the current period has expired (or never started)
+    if (Date.now() - (usage_period_start || 0) >= MONTH_MS) {
+      const now = Date.now();
+      stmts.resetUsage.run(now, now, req.user.id);
+      req.user.searches_used = 0;
+      req.user.websites_used = 0;
+      req.user.usage_period_start = now;
+    }
+
+    if (type === 'search' && req.user.searches_used >= limits.searches) {
+      return res.status(402).json({
+        error: 'Monthly lead search limit reached',
+        limit_type: 'searches',
+        used: req.user.searches_used,
+        limit: limits.searches,
+        tier,
+        upgrade: true,
+      });
+    }
+    if (type === 'website' && req.user.websites_used >= limits.websites) {
+      return res.status(402).json({
+        error: 'Monthly website generation limit reached',
+        limit_type: 'websites',
+        used: req.user.websites_used,
+        limit: limits.websites,
+        tier,
+        upgrade: true,
+      });
+    }
+    next();
+  };
 }
+
+// ── POST /register ────────────────────────────────────────────────────────────
+app.post('/register', authLimiter, async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Invalid email address.' });
+  if (password.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+
+  const existing = stmts.getUserByEmail.get(email.trim());
+  if (existing) return res.status(409).json({ error: 'An account with this email already exists.' });
+
+  const id = crypto.randomUUID();
+  const password_hash = await bcrypt.hash(password, 12);
+  const now = Date.now();
+  stmts.insertUser.run(id, email.toLowerCase().trim(), password_hash, 'free', now, now, now);
+
+  const token = signToken({ userId: id, createdAt: now, expiresAt: now + 90 * 24 * 60 * 60 * 1000 });
+  const limits = TIER_LIMITS.free;
+  res.json({ token, tier: 'free', searches: { used: 0, limit: limits.searches, remaining: limits.searches }, websites: { used: 0, limit: limits.websites, remaining: limits.websites } });
+});
 
 // ── POST /auth ────────────────────────────────────────────────────────────────
-app.post('/auth', authLimiter, (req, res) => {
-  if (!ACCESS_PASSWORD) {
-    // Dev mode — no password required
-    const token = signToken({ sessionId: crypto.randomUUID(), tier: 'free', createdAt: Date.now() });
-    return res.json({ token, tier: 'free', used: 0, limit: FREE_SEARCH_LIMIT, remaining: FREE_SEARCH_LIMIT });
+app.post('/auth', authLimiter, async (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
+
+  const user = stmts.getUserByEmail.get(email.trim());
+  if (!user) {
+    // Constant-time response to prevent email enumeration
+    await bcrypt.hash('dummy', 12);
+    return res.status(401).json({ error: 'Invalid email or password.' });
   }
-  const { password } = req.body || {};
-  if (!password || password !== ACCESS_PASSWORD) {
-    return res.status(401).json({ error: 'Incorrect password' });
-  }
-  const sessionId = crypto.randomUUID();
-  const token = signToken({ sessionId, tier: 'free', createdAt: Date.now() });
-  res.json({ token, tier: 'free', used: 0, limit: FREE_SEARCH_LIMIT, remaining: FREE_SEARCH_LIMIT });
+
+  const valid = await bcrypt.compare(password, user.password_hash);
+  if (!valid) return res.status(401).json({ error: 'Invalid email or password.' });
+
+  const now = Date.now();
+  const token = signToken({ userId: user.id, createdAt: now, expiresAt: now + 90 * 24 * 60 * 60 * 1000 });
+  const limits = TIER_LIMITS[user.tier] || TIER_LIMITS.free;
+  const searches_used = now - (user.usage_period_start || 0) >= MONTH_MS ? 0 : user.searches_used;
+  const websites_used = now - (user.usage_period_start || 0) >= MONTH_MS ? 0 : (user.websites_used || 0);
+  res.json({
+    token,
+    tier: user.tier,
+    searches: { used: searches_used, limit: limits.searches, remaining: Math.max(0, limits.searches - searches_used) },
+    websites: { used: websites_used, limit: limits.websites, remaining: Math.max(0, limits.websites - websites_used) },
+  });
 });
 
 // ── GET /usage ────────────────────────────────────────────────────────────────
 app.get('/usage', requireAuth, (req, res) => {
-  if (!req.session) {
-    return res.json({ tier: 'free', used: 0, limit: FREE_SEARCH_LIMIT, remaining: FREE_SEARCH_LIMIT });
-  }
-  const { sessionId, tier } = req.session;
-  if (tier === 'pro') return res.json({ tier: 'pro', used: 0, limit: null, remaining: null });
-  const usage = getUsage(sessionId);
+  const { tier, searches_used, websites_used, usage_period_start } = req.user;
+  const limits = TIER_LIMITS[tier] || TIER_LIMITS.free;
+  const now = Date.now();
+  const periodExpired = now - (usage_period_start || 0) >= MONTH_MS;
+  const s = periodExpired ? 0 : (searches_used || 0);
+  const w = periodExpired ? 0 : (websites_used || 0);
   res.json({
-    tier: 'free',
-    used: usage.searches,
-    limit: FREE_SEARCH_LIMIT,
-    remaining: FREE_SEARCH_LIMIT - usage.searches,
+    tier,
+    searches:  { used: s, limit: limits.searches,  remaining: Math.max(0, limits.searches  - s) },
+    websites:  { used: w, limit: limits.websites,   remaining: Math.max(0, limits.websites  - w) },
+    period_start:    usage_period_start || null,
+    period_resets_at: usage_period_start ? usage_period_start + MONTH_MS : null,
   });
 });
 
@@ -174,25 +273,32 @@ app.post('/create-checkout-session', requireAuth, async (req, res) => {
     return res.status(503).json({ error: 'Payments not configured. Add STRIPE_SECRET_KEY and price IDs to Render env vars.' });
   }
   const PRICE_MAP = {
-    starter: process.env.STRIPE_PRICE_STARTER,
+    basic:   process.env.STRIPE_PRICE_BASIC || process.env.STRIPE_PRICE_STARTER,
+    starter: process.env.STRIPE_PRICE_BASIC || process.env.STRIPE_PRICE_STARTER, // legacy
     pro:     process.env.STRIPE_PRICE_PRO,
-    agency:  process.env.STRIPE_PRICE_AGENCY,
   };
-  const { tier = 'starter' } = req.body || {};
+  const { tier = 'basic' } = req.body || {};
   const priceId = PRICE_MAP[tier];
   if (!priceId) {
     return res.status(503).json({ error: `Add STRIPE_PRICE_${tier.toUpperCase()} to Render env vars.` });
   }
   try {
     const FRONTEND = process.env.FRONTEND_URL || 'https://leadhunts.netlify.app';
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams = {
       payment_method_types: ['card'],
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${FRONTEND}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${FRONTEND}?payment=cancelled`,
-      metadata: { sessionId: req.session?.sessionId },
-    });
+      metadata: { userId: req.user.id, tier },
+      subscription_data: { metadata: { userId: req.user.id, tier } },
+    };
+    if (req.user.stripe_customer_id) {
+      sessionParams.customer = req.user.stripe_customer_id;
+    } else {
+      sessionParams.customer_email = req.user.email;
+    }
+    const session = await stripe.checkout.sessions.create(sessionParams);
     res.json({ checkoutUrl: session.url });
   } catch(e) {
     res.status(500).json({ error: e.message });
@@ -203,25 +309,115 @@ app.get('/payment-success', requireAuth, async (req, res) => {
   if (!stripe) return res.status(503).json({ error: 'Payments not configured' });
   const { session_id } = req.query;
   try {
-    const session = await stripe.checkout.sessions.retrieve(session_id);
+    const session = await stripe.checkout.sessions.retrieve(session_id, { expand: ['subscription'] });
     if (session.payment_status !== 'paid') {
       return res.status(402).json({ error: 'Payment not confirmed' });
     }
-    const sessionId = req.session?.sessionId || crypto.randomUUID();
-    const token = signToken({
-      sessionId,
-      tier: 'pro',
-      createdAt: Date.now(),
-      expiresAt: Date.now() + 31 * 24 * 60 * 60 * 1000,
-    });
-    res.json({ token, tier: 'pro' });
+    const tier = session.metadata?.tier || 'basic';
+    const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+    const subscriptionId = typeof session.subscription === 'string'
+      ? session.subscription
+      : session.subscription?.id;
+    stmts.updateTier.run(tier, customerId, subscriptionId, 'active', Date.now(), req.user.id);
+    res.json({ tier });
   } catch(e) {
     res.status(500).json({ error: e.message });
   }
 });
 
+// ── POST /webhook — Stripe subscription lifecycle ──────────────────────────────
+app.post('/webhook', async (req, res) => {
+  const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!stripe || !WEBHOOK_SECRET) return res.status(200).json({ received: true });
+
+  let event;
+  try {
+    event = stripe.webhooks.constructEvent(req.body, req.headers['stripe-signature'], WEBHOOK_SECRET);
+  } catch(e) {
+    console.error('[Webhook] Signature verification failed:', e.message);
+    return res.status(400).send(`Webhook Error: ${e.message}`);
+  }
+
+  // Price ID → tier reverse map (built at request time so env vars are resolved)
+  const PRICE_TO_TIER = Object.fromEntries(
+    Object.entries({
+      basic:   process.env.STRIPE_PRICE_BASIC || process.env.STRIPE_PRICE_STARTER,
+      starter: process.env.STRIPE_PRICE_BASIC || process.env.STRIPE_PRICE_STARTER,
+      pro:     process.env.STRIPE_PRICE_PRO,
+    }).filter(([, v]) => v).map(([k, v]) => [v, k === 'starter' ? 'basic' : k])
+  );
+
+  try {
+    switch(event.type) {
+      case 'checkout.session.completed': {
+        const session = event.data.object;
+        if (session.payment_status !== 'paid') break;
+
+        // Retrieve line items to get the actual price ID — don't trust metadata.tier alone
+        const sessionWithItems = await stripe.checkout.sessions.retrieve(session.id, {
+          expand: ['line_items'],
+        });
+        const priceId = sessionWithItems.line_items?.data?.[0]?.price?.id;
+        const tier = PRICE_TO_TIER[priceId] || session.metadata?.tier;
+
+        if (!tier) {
+          console.error('[Webhook] checkout.session.completed: unknown price ID', priceId, '— no tier mapped');
+          break;
+        }
+
+        const userId = session.metadata?.userId;
+        const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id;
+        const subscriptionId = typeof session.subscription === 'string'
+          ? session.subscription
+          : session.subscription?.id;
+
+        if (userId) {
+          stmts.updateTier.run(tier, customerId, subscriptionId, 'active', Date.now(), userId);
+          console.log('[Webhook] checkout.session.completed: user', userId, '→', tier, '(price:', priceId, ')');
+        } else if (subscriptionId) {
+          stmts.updateSubStatus.run('active', tier, Date.now(), subscriptionId);
+          console.log('[Webhook] checkout.session.completed: subscription', subscriptionId, '→', tier);
+        } else {
+          console.warn('[Webhook] checkout.session.completed: no userId or subscriptionId in session', session.id);
+        }
+        break;
+      }
+      case 'customer.subscription.deleted': {
+        const sub = event.data.object;
+        stmts.updateSubStatus.run('cancelled', 'free', Date.now(), sub.id);
+        console.log('[Webhook] Subscription cancelled, user downgraded to free:', sub.id);
+        break;
+      }
+      case 'customer.subscription.updated': {
+        const sub = event.data.object;
+        const tier = sub.metadata?.tier;
+        if (sub.status === 'active' && tier) {
+          stmts.updateSubStatus.run('active', tier, Date.now(), sub.id);
+        } else if (sub.status === 'past_due' || sub.status === 'unpaid') {
+          stmts.updateSubStatus.run(sub.status, 'free', Date.now(), sub.id);
+          console.log('[Webhook] Subscription', sub.status, '— user downgraded:', sub.id);
+        }
+        break;
+      }
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object;
+        if (invoice.subscription) {
+          const sub = await stripe.subscriptions.retrieve(invoice.subscription);
+          const tier = sub.metadata?.tier;
+          if (tier) stmts.updateSubStatus.run('active', tier, Date.now(), sub.id);
+        }
+        break;
+      }
+    }
+  } catch(e) {
+    console.error('[Webhook] Handler error:', e.message);
+  }
+
+  res.json({ received: true });
+});
+
 // ── GET /search ───────────────────────────────────────────────────────────────
-app.get('/search', requireAuth, checkUsageLimit, searchLimiter, async (req, res) => {
+app.get('/search', requireAuth, checkUsageLimit('search'), searchLimiter, async (req, res) => {
   try {
     const { query } = req.query;
     const cacheKey = (query || '').toLowerCase().trim();
@@ -233,10 +429,7 @@ app.get('/search', requireAuth, checkUsageLimit, searchLimiter, async (req, res)
     const data = await response.json();
 
     // Increment usage only on live (non-cached) responses
-    if (req.session) {
-      const usage = getUsage(req.session.sessionId);
-      usage.searches++;
-    }
+    stmts.incrementSearches.run(Date.now(), req.user.id);
 
     setCache(cacheKey, data);
     res.json(data);
@@ -398,17 +591,20 @@ app.get('/debug', (req, res) => {
     has_anthropic_key: !!ANTHROPIC_KEY,
     key_preview: ANTHROPIC_KEY ? ANTHROPIC_KEY.substring(0, 10) + '...' : 'NOT SET',
     has_places_key: !!PLACES_KEY,
-    auth_enabled: !!ACCESS_PASSWORD,
     stripe_enabled: !!stripe,
     cached_queries: searchCache.size,
+    db_path: process.env.DB_PATH || path.join(__dirname, 'leadhunt.db'),
   });
 });
 
 // ── POST /generate ────────────────────────────────────────────────────────────
-app.post('/generate', requireAuth, async (req, res) => {
+app.post('/generate', requireAuth, checkUsageLimit('website'), async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!ANTHROPIC_KEY) return res.status(500).json({ error: 'ANTHROPIC_KEY not set' });
+
+    // Count generation immediately so limits can't be gamed by disconnecting mid-stream
+    stmts.incrementWebsites.run(Date.now(), req.user.id);
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');

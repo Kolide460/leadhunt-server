@@ -17,22 +17,44 @@ A lead generation tool that finds local businesses without websites on Google Ma
 ## Tech Stack
 - **Frontend:** Single HTML file (business-finder.html) hosted on Netlify
 - **Backend:** Node.js + Express server hosted on Render (free tier)
+- **Database:** SQLite via better-sqlite3 (file: leadhunt.db, set DB_PATH env var to persist across Render deploys)
+- **Auth:** Email/password with bcryptjs, HMAC-signed tokens (90-day expiry)
 - **APIs used:**
   - Google Places API (Text Search + Place Details + Photos)
   - Anthropic Claude API (website generation + logo generation)
 
+## Auth & Subscription Tiers
+- **Free:** 2 searches, no card required — register with email/password
+- **Starter:** £29/month — unlimited searches
+- **Pro:** £79/month — unlimited searches + priority support
+- **Agency:** £199/month — unlimited searches + team features
+
 ## Backend Endpoints
-- `GET /search?query=` — searches Google Maps
+- `POST /register` — create account (email + password)
+- `POST /auth` — login (email + password) → returns token
+- `GET /usage` — current tier + searches used (requires auth)
+- `GET /search?query=` — searches Google Maps (increments usage)
 - `GET /details?place_id=` — gets rich business data (hours, reviews, photos)
 - `GET /photo?ref=&maxwidth=` — gets Google Places photo URL
 - `GET /scrape?url=` — scrapes existing website for logo, social media, email
 - `POST /generate-logo` — generates SVG logo using Claude
 - `POST /generate` — generates full website HTML using Claude
+- `POST /create-checkout-session` — creates Stripe checkout session
+- `GET /payment-success?session_id=` — confirms payment + upgrades user in DB
+- `POST /webhook` — Stripe webhook (handles cancellations, renewals)
 - `GET /debug` — checks API keys are loaded
 
 ## Environment Variables on Render
 - `PLACES_KEY` = Google Places API key
 - `ANTHROPIC_KEY` = Anthropic API key
+- `TOKEN_SECRET` = HMAC secret for auth tokens (required in prod)
+- `DB_PATH` = path to SQLite file (e.g. `/data/leadhunt.db` — use Render disk)
+- `STRIPE_SECRET_KEY` = Stripe secret key
+- `STRIPE_PRICE_STARTER` = Stripe price ID for Starter tier
+- `STRIPE_PRICE_PRO` = Stripe price ID for Pro tier
+- `STRIPE_PRICE_AGENCY` = Stripe price ID for Agency tier
+- `STRIPE_WEBHOOK_SECRET` = Stripe webhook signing secret
+- `FRONTEND_URL` = frontend URL for Stripe redirect (default: https://leadhunts.netlify.app)
 
 ## Current Features
 - Search businesses by type and location
@@ -50,8 +72,7 @@ A lead generation tool that finds local businesses without websites on Google Ma
 
 ## Known Issues / Things To Improve
 - Preview iframe broken on Netlify due to CSP (shows success screen + download instead)
-- Need to add user login/authentication
-- Need Stripe payments for SaaS version
+- Render free tier has ephemeral filesystem — use a Render persistent disk and set DB_PATH to keep SQLite across deploys
 - Want to add a dashboard to track leads contacted
 - Want to improve logo generation quality
 - Need a proper domain
