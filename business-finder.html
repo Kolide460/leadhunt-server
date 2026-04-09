@@ -671,17 +671,17 @@ function updateUsageUI(data) {
   const bar = document.getElementById('usageBar');
   if (!wrap) return;
   wrap.style.display = 'block';
-  const tierLabels = { starter: 'Starter', pro: 'Pro', agency: 'Agency' };
-  if (data.tier && data.tier !== 'free') {
-    label.innerHTML = `<span style="color:var(--accent)">✦ ${tierLabels[data.tier] || data.tier} — unlimited searches</span>`;
-    bar.style.display = 'none';
-    return;
-  }
+
+  // Support both new nested format and legacy flat format
+  const searches = data.searches || { used: data.used || 0, limit: data.limit || 4 };
+  const websites = data.websites || { used: 0, limit: 2 };
+  const tierLabels = { free: 'Free', basic: 'Basic', starter: 'Basic', pro: 'Pro', agency: 'Pro' };
+  const tierLabel = tierLabels[data.tier] || data.tier || 'Free';
+
   bar.style.display = 'block';
-  const used = data.used || 0;
-  const limit = data.limit || 2;
-  const pct = Math.min(100, (used / limit) * 100);
-  label.textContent = `${used} / ${limit} free searches used`;
+  const pct = Math.min(100, (searches.used / searches.limit) * 100);
+  const prefix = data.tier && data.tier !== 'free' ? `✦ ${tierLabel} — ` : '';
+  label.innerHTML = `<span style="${pct >= 80 ? 'color:var(--warning)' : ''}">${prefix}${searches.used} / ${searches.limit} searches · ${websites.used} / ${websites.limit} sites this month</span>`;
   barFill.style.width = pct + '%';
   barFill.style.background = pct >= 80 ? 'var(--warning)' : 'var(--accent)';
 }
